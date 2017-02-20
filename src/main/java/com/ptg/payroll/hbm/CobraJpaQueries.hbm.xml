@@ -1,0 +1,87 @@
+<?xml version="1.0"?>
+<!DOCTYPE hibernate-mapping PUBLIC "-//Hibernate/Hibernate Mapping DTD 3.0//EN"  "http://hibernate.sourceforge.net/hibernate-mapping-3.0.dtd">
+<hibernate-mapping>
+
+    <sql-query name="SQL.cobra.payment.add.new.payment">
+        INSERT INTO PS_T2_COBRA_CC_HLD
+        (EMPLID, EMPL_RCD, COMPANY, T2_TRANS_DATE, PAYMENT_AMOUNT, T2_RECEIPT_EMAIL, T2_CONFIRMATION_ID, T2_CHARGE_ID, T2_REFUND_ID)
+        VALUES (:employeeId, :employeeRCD, :companyId, sysdate, :paymentAmount, :receiptEmail, :confirmationId, :chargeId, :refundId)
+    </sql-query>
+
+    <sql-query name="SQL.cobra.payment.update.payment">
+        UPDATE PS_T2_COBRA_CC_HLD  SET T2_CONFIRMATION_ID = :newTrxId, T2_CHARGE_ID = :chargeId where T2_CONFIRMATION_ID = :currentTrxId
+    </sql-query>
+
+    <sql-query name="SQL.cobra.payment.delete.payment">
+        DELETE from PS_T2_COBRA_CC_HLD  where T2_CONFIRMATION_ID = :currentTrxId
+    </sql-query>
+
+    <sql-query name="SQL.cobra.payment.validate.cobra.payment.eligibility">
+        select distinct a.emplid, A.empl_rcd from ps_ben_bi_enr_efdt a
+        where a.BILLING_STATUS='A' and  a.EMPLID = :employeeId and a.EMPL_RCD = :employeeRcd
+        and a.EFFDT=
+        (select max(a1.effdt)
+        from ps_ben_bi_enr_efdt a1
+        where a1.emplid = a.emplid and
+        a1.empl_rcd = a.empl_rcd and
+        a1.plan_type = a.plan_type and
+        a1.cobra_event_id = a.cobra_event_id and
+        a1.effdt &lt;= sysdate);
+    </sql-query>
+
+    <sql-query name="SQL.cobra.payment.total.monthly.premium">
+        select to_char(sum(a.total_charge),'L99G999D99MI',
+        'NLS_NUMERIC_CHARACTERS = ''.,''
+        NLS_CURRENCY = ''$''') from ps_ben_bi_chg_vw a
+        where a.emplid = :employeeId and a.EMPL_RCD = :employeeRcd
+        and a.bill_per_cd =  (select max(b.bill_per_cd) from ps_ben_bi_chg_vw b
+        where b.emplid = a.emplid and a.EMPL_RCD = a.EMPL_RCD)
+        group by emplid, empl_rcd, date_due
+    </sql-query>
+
+    <sql-query name="SQL.cobra.payment.total.monthly.due.date">
+        select nvl( (select date_due from ps_t2_cc_due_date where emplid = :employeeId and empl_rcd = :employeeRcd),
+        to_char(sysdate + 30, 'DD-MON-YYYY')
+        ) from dual
+    </sql-query>
+
+    <sql-query name="SQL.cobra.payment.monthly.due.display">
+        select distinct a.period_begin_dt from ps_ben_bi_calendar a, ps_ben_bi_charge b
+        where a.bill_per_cd = b.bill_per_cd
+        and b.emplid = :employeeId
+        and b.empl_rcd = :employeeRcd
+        and b.bill_per_cd = (select max(b1.bill_per_cd) from ps_ben_bi_charge b1
+        where b1.emplid = b.emplid
+        and b1.empl_rcd = b.empl_rcd
+        and b1.bill_per_cd &lt;= to_char(sysdate,'YYMM'))
+    </sql-query>
+
+
+    <sql-query name="SQL.cobra.payment.last.payment.details">
+        select T2_TRANS_DATE, PAYMENT_AMOUNT from PS_T2_COBRA_CC_HLD
+        where EMPLID = :employeeId and company = :companyId
+        and T2_TRANS_DATE = (
+        select max(T2_TRANS_DATE) from PS_T2_COBRA_CC_HLD h
+        where h.EMPLID = :employeeId and h.company = :companyId)
+    </sql-query>
+
+    <sql-query name="SQL.cobra.payment.charge_details">
+        select e.FIRST_NAME, e.LAST_NAME,c.DESCR,  h.COMPANY, h.EMPLID, h.T2_TRANS_DATE, h.PAYMENT_AMOUNT, h.T2_RECEIPT_EMAIL
+        from PS_T2_COBRA_CC_HLD h, PS_EMPLOYEES e, PS_COMPANY_TBL c
+        where  h.T2_CHARGE_ID = :chargeId
+        and h.EMPLID = e.EMPLID and h.EMPL_RCD = e.EMPL_RCD
+        and e.COMPANY = c.COMPANY
+    </sql-query>
+
+    <sql-query name="SQL.cobra.payment.total.paid">
+        select sum(PAYMENT_AMOUNT)
+        from PS_T2_COBRA_CC_HLD
+        where EMPLID = :employeeId
+        and EMPL_RCD = :employeeRcd
+    </sql-query>
+
+
+
+
+
+</hibernate-mapping>

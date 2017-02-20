@@ -1,0 +1,311 @@
+<?xml version="1.0"?>
+<!DOCTYPE hibernate-mapping PUBLIC "-//Hibernate/Hibernate Mapping DTD 3.0//EN"  "http://hibernate.sourceforge.net/hibernate-mapping-3.0.dtd">
+<!--
+    Common named JPA queries for TriNet Open Enrollment.
+-->
+
+<hibernate-mapping>
+
+    <sql-query name="SQL.NewHire.hrp.stg.delete">
+        UPDATE NEW_HIRE_STG_TBL SET STATUS='D' where STG_ID = :newHireStgId
+    </sql-query>
+
+    <sql-query name="SQL.NewHire.hrp.stg.select">
+        SELECT STG_ID, EMPL_ID, COMPANY_ID, PF_CLIENT, SSN, FORM_OF_ADDRESS,
+                FIRST_NAME, LAST_NAME, MIDDLE_NAME, COUNTRY, ADDRESS_LINE_1, ADDRESS_LINE_2,
+                CITY, COUNTY, STATE, POSTAL_CODE, HOME_PHONE, HOME_EMAIL, GENDER,
+                ETHNICITY, MILITARY_STATUS, TRINET_START_DATE, REASON, EMPLOYMENT_TYPE,
+                REG_TEMP_INDICATOR, EMPLOYEE_CLASS, ESTIMATED_ANNUAL_WAGES, BENEFIT_CLASS_ID,
+                STANDARD_HOURS_PER_WEEK, BUSINESS_TITLE, JOB_CODE_ID, FLA_STATUS,
+                COMPENSATION_BASIS, COMPENSATION_RATE, DEPARTMENT_ID, SUPERVISOR_ID, TIPPED, WORK_LOCATION_ID,
+                PAYGROUP_ID, ALTERNATE_EMPL_ID, WORK_EMAIL, GROUPING_A_PER_LEVEL, GROUPING_B_PER_SPONSOR, VACATION_OR_PTO_ID,
+                SICK_ID, PERSONAL_TIME_ID, FLOATING_HOLIDAYS_ID, VACATION_OR_PTO_B_PLAN_ID,
+                SICK_BENEFIT_PLAN_ID, PERSONAL_TIME_B_PLAN_ID, FLOATING_HOLIDAY_B_PLAN_ID,
+                BIRTH_DATE, WC_CLASSIFICATION_ID, WC_STATE, EMPLOYEE_JOB_DUTIES, APPROVAL_STATUS, DEPT_SPLIT_FLAG,DEPT_SPLIT,
+                HEALTH_CARE_NBR, USER_COUNTRY, PERSON_ID, USER_ROLE, LAST_HIRE, COMPANY_SENIOR_DATE, EFFECTIVE_DATE,
+                WORK_PHONE, EXT, EMAIL_TYPE, EMAIL, FUTURE_B_CLASS_ID,VARIABLE_HOUR
+        FROM NEW_HIRE_STG_TBL
+        WHERE STG_ID = :stgId
+    </sql-query>
+
+    <sql-query name="SQL.NewHire.hrp.stg.select.seq">
+        SELECT NEW_HIRE_AUDIT_KEY_ID_SEQ.NEXTVAL FROM DUAL
+    </sql-query>
+
+    <sql-query name="SQL.NewHire.hrp.stg.select.by.company">
+        SELECT STG_ID,FIRST_NAME,LAST_NAME
+        FROM NEW_HIRE_STG_TBL where COMPANY_ID = :companyId AND STATUS='N'
+    </sql-query>
+
+    <sql-query name="SQL.NewHire.hrp.stg.update.by.stgid">
+        UPDATE NEW_HIRE_STG_TBL SET
+            EMPL_ID = :employeeId, COMPANY_ID = :companyId, PF_CLIENT = :pfClient, SSN = :ssn,
+            FORM_OF_ADDRESS = :formOfAddress, FIRST_NAME = :firstName, LAST_NAME = :lastName, MIDDLE_NAME = :middleName,
+            COUNTRY = :country, ADDRESS_LINE_1 = :addressLine1, ADDRESS_LINE_2 = :addressLine2, CITY = :city, COUNTY = :county,
+            STATE = :state, POSTAL_CODE = :postalCode, HOME_PHONE = :homePhone, HOME_EMAIL = :homeEmail, GENDER = :gender,
+            ETHNICITY = :ethnicity, MILITARY_STATUS = :militaryStatus, TRINET_START_DATE = :trinetStartDate, REASON = :reason,
+            EMPLOYMENT_TYPE = :employmentType, REG_TEMP_INDICATOR = :regTempIndicator, EMPLOYEE_CLASS = :employeeClass,
+            ESTIMATED_ANNUAL_WAGES = :estimatedAnnualWages, BENEFIT_CLASS_ID = :benefitClassId,
+            STANDARD_HOURS_PER_WEEK = :standardHoursPerWeek, BUSINESS_TITLE = :businessTitle, JOB_CODE_ID = :jobCodeId,
+            FLA_STATUS = :flaStatus, COMPENSATION_BASIS = :compensationBasis, COMPENSATION_RATE = :compensationRate,
+            DEPARTMENT_ID = :departmentId, SUPERVISOR_ID = :supervisorId, TIPPED = :tipped, WORK_LOCATION_ID = :workLocationId,
+            PAYGROUP_ID = :paygroupId, ALTERNATE_EMPL_ID = :alternateEmplId, WORK_EMAIL = :workEmail,
+            GROUPING_A_PER_LEVEL = :groupingAPerLevel, GROUPING_B_PER_SPONSOR = :groupingBPerSponsor,
+            VACATION_OR_PTO_ID = :vacationOrPtoId,SICK_ID = :sickId, PERSONAL_TIME_ID = :personalTimeId,
+            FLOATING_HOLIDAYS_ID = :floatingHolidaysId, VACATION_OR_PTO_B_PLAN_ID = :vacationOrPtoBPlanId,
+            SICK_BENEFIT_PLAN_ID = :sickBenefitPlanId, PERSONAL_TIME_B_PLAN_ID = :personalTimeBPlanId,
+            FLOATING_HOLIDAY_B_PLAN_ID = :floatingHolidayBPlanId, BIRTH_DATE = :birthDate,
+            WC_CLASSIFICATION_ID = :wcClassificationId, WC_STATE = :wcState, EMPLOYEE_JOB_DUTIES = :employeeJobDuties,
+            APPROVAL_STATUS = :approvalStatus, DEPT_SPLIT_FLAG = :deptSplitFlag, DEPT_SPLIT = :deptSplit,
+            HEALTH_CARE_NBR = :healthCareNbr, USER_COUNTRY = :userCountry, PERSON_ID = :personId, USER_ROLE = :userRole,
+            LAST_HIRE = :lastHire, COMPANY_SENIOR_DATE = :companySeniorDate, EFFECTIVE_DATE = :effectiveDate,
+            WORK_PHONE = :workHome, EXT = :ext, EMAIL_TYPE = :emailType, EMAIL = :email, FUTURE_B_CLASS_ID = :futureBClassId,
+            VARIABLE_HOUR = :variableHour
+        WHERE STG_ID = :stgId
+    </sql-query>
+
+    <sql-query name="SQL.NewHire.hrp.stg.insert">
+        INSERT INTO NEW_HIRE_STG_TBL (
+                STG_ID, EMPL_ID, COMPANY_ID, PF_CLIENT, SSN, FORM_OF_ADDRESS,
+                FIRST_NAME, LAST_NAME, MIDDLE_NAME, COUNTRY, ADDRESS_LINE_1, ADDRESS_LINE_2,
+                CITY, COUNTY, STATE, POSTAL_CODE, HOME_PHONE, HOME_EMAIL, GENDER,
+                ETHNICITY, MILITARY_STATUS, TRINET_START_DATE, REASON, EMPLOYMENT_TYPE,
+                REG_TEMP_INDICATOR, EMPLOYEE_CLASS, ESTIMATED_ANNUAL_WAGES, BENEFIT_CLASS_ID,
+                STANDARD_HOURS_PER_WEEK, BUSINESS_TITLE, JOB_CODE_ID, FLA_STATUS,
+                COMPENSATION_BASIS, COMPENSATION_RATE, DEPARTMENT_ID, SUPERVISOR_ID, TIPPED, WORK_LOCATION_ID,
+                PAYGROUP_ID, ALTERNATE_EMPL_ID, WORK_EMAIL, GROUPING_A_PER_LEVEL, GROUPING_B_PER_SPONSOR, VACATION_OR_PTO_ID,
+                SICK_ID, PERSONAL_TIME_ID, FLOATING_HOLIDAYS_ID, VACATION_OR_PTO_B_PLAN_ID,
+                SICK_BENEFIT_PLAN_ID, PERSONAL_TIME_B_PLAN_ID, FLOATING_HOLIDAY_B_PLAN_ID,
+                BIRTH_DATE, WC_CLASSIFICATION_ID, WC_STATE, EMPLOYEE_JOB_DUTIES, APPROVAL_STATUS, DEPT_SPLIT_FLAG,DEPT_SPLIT,
+                HEALTH_CARE_NBR, USER_COUNTRY, PERSON_ID, USER_ROLE, LAST_HIRE, COMPANY_SENIOR_DATE, EFFECTIVE_DATE,
+                WORK_PHONE, EXT, EMAIL_TYPE, EMAIL, FUTURE_B_CLASS_ID,STATUS,VARIABLE_HOUR)
+            VALUES
+            (:stgId, :employeeId, :companyId, :pfClient, :ssn, :formOfAddress,
+             :firstName, :lastName, :middleName, :country, :addressLine1, :addressLine2,
+             :city, :county, :state, :postalCode, :homePhone, :homeEmail, :gender,
+             :ethnicity, :militaryStatus, :trinetStartDate, :reason, :employmentType,
+             :regTempIndicator, :employeeClass, :estimatedAnnualWages, :benefitClassId,
+             :standardHoursPerWeek, :businessTitle, :jobCodeId, :flaStatus,
+             :compensationBasis, :compensationRate, :departmentId, :supervisorId, :tipped,:workLocationId,
+             :paygroupId, :alternateEmplId, :workEmail, :groupingAPerLevel, :groupingBPerSponsor, :vacationOrPtoId,
+             :sickId, :personalTimeId, :floatingHolidaysId, :vacationOrPtoBPlanId,
+             :sickBenefitPlanId, :personalTimeBPlanId, :floatingHolidayBPlanId,
+             :birthDate, :wcClassificationId, :wcState, :employeeJobDuties, :approvalStatus, :deptSplitFlag, :deptSplit,
+             :healthCareNbr, :userCountry,:personId, :userRole, :lastHire, :companySeniorDate, :effectiveDate,
+             :workHome, :ext, :emailType, :email, :futureBClassId,'N',:variableHour
+            )
+    </sql-query>
+
+    <sql-query name="SQL.NewHire.hrp.select.tipped.status">
+            select TIPS_PROCESSING from PS_COMPANY_TBL where company = :companyId
+            and effdt = (select max(effdt) from PS_COMPANY_TBL where company = :companyId)
+    </sql-query>
+
+
+    <sql-query name="SQL.NewHire.hrp.select.personid.by.emplid">
+        select PERSONID from  person_keys where pers_key= :employeeId and ROWNUM=1
+    </sql-query>
+
+    <sql-query name="SQL.NewHire.hrp.validate.paygroup.effdt">
+        SELECT effdt
+        FROM PS_PAYGROUP_TBL
+        where company = :company and paygroup = :paygroup
+        and effdt &lt;= to_date(:effdt,'YYYY-MM-DD')
+        and effdt =
+        (SELECT max(effdt)
+           FROM PS_PAYGROUP_TBL
+             where company = :company and paygroup = :paygroup
+             and effdt &lt;= to_date(:effdt,'YYYY-MM-DD'))
+    </sql-query>
+
+    <sql-query name="SQL.NewHire.hrp.validate.location.effdt">
+        SELECT effdt,descr
+        FROM ps_location_tbl
+        where PF_CLIENT= :pfClient and location = :location
+        and effdt &lt;= to_date(:effdt,'YYYY-MM-DD')
+        and effdt =
+        (SELECT max(effdt)
+          FROM ps_location_tbl
+            where PF_CLIENT = :pfClient and location = :location
+            and effdt &lt;= to_date(:effdt,'YYYY-MM-DD'))
+    </sql-query>
+
+    <sql-query name="SQL.NewHire.hrp.validate.department.effdt">
+        SELECT effdt,descr
+        FROM PS_DEPT_TBL
+        where company = :company and deptid = :deptId
+        and effdt &lt;= to_date(:effdt,'YYYY-MM-DD')
+        and effdt =
+        (SELECT max(effdt)
+           FROM PS_DEPT_TBL
+             where company = :company and deptid = :deptId
+             and effdt &lt;= to_date(:effdt,'YYYY-MM-DD'))
+    </sql-query>
+
+    <sql-query name="SQL.NewHire.hrp.validate.company.variable.hour">
+        SELECT t2_aca_large_emplr FROM PS_T2_CLIENTOPTION
+        WHERE company = :companyId
+    </sql-query>
+
+    <sql-query name="SQL.NewHire.hrp.audit.validate">
+        select AUDIT_LOG_PK from NEW_HIRE_AUDIT_LOG where PERSONID = :personId and UNIQUEID = :uniqueId
+    </sql-query>
+
+    <sql-query name="SQL.NewHire.hrp.audit.insert">
+        INSERT INTO NEW_HIRE_AUDIT_LOG
+        (AUDIT_LOG_PK, UNIQUEID, AUDIT_KEY, PERSONID, FIRST_NAME, LAST_NAME, SSN, OPERATOR_EMPL_ID,
+        COMPANY_ID, HRP_OPERATION_STATUS, HRP_OPERATION_ERR_MSG, HRP_OPERATION_TIMESTAMP,PERSONID_INIT,IS_DELETE)
+        VALUES(
+        NEW_HIRE_AUDIT_LOG_SEQ.NEXTVAL, :uniqueId, :auditKey, :personId, :firstName, :lastName, :ssn, :operator, :companyId,
+        :hrpOperationStatus, :hrpOperationErrorMessage, :hrpOperationTimestamp, :personInit,'N'
+        )
+    </sql-query>
+
+    <sql-query name="SQL.NewHire.hrp.audit.update">
+        UPDATE NEW_HIRE_AUDIT_LOG
+        SET FIRST_NAME = :firstName, LAST_NAME = :lastName, SSN = :ssn, OPERATOR_EMPL_ID = :operator,
+        HRP_OPERATION_STATUS = :hrpOperationStatus, HRP_OPERATION_ERR_MSG = :hrpOperationErrorMessage,
+        HRP_OPERATION_TIMESTAMP = :hrpOperationTimestamp
+        WHERE AUDIT_KEY = :auditKey
+    </sql-query>
+
+    <sql-query name="SQL.NewHire.hrp.audit.update.broker.transaction">
+        UPDATE NEW_HIRE_AUDIT_LOG
+        SET HRP_TO_PS_STATUS = :brokerResponseStatus,
+        HRP_TO_PS_ERR_MSG = :brokerErrorMessage, HRP_TO_PS_XML = :brokerRequestXML,
+        BROKER_TRX_ID = :brokerTransactionId, HRP_TO_PS_TIMESTAMP = :brokerRequestTimestamp
+        WHERE PERSONID = :personId and UNIQUEID = :uniqueId
+    </sql-query>
+
+    <sql-query name="SQL.NewHire.hrp.audit.select.by.company">
+        SELECT PERSONID,FIRST_NAME,LAST_NAME,SSN,COMPANY_ID,BROKER_TRX_ID,HRP_TO_PS_STATUS,PS_TO_HRP_STATUS,HRP_OPERATION_TIMESTAMP,UNIQUEID from NEW_HIRE_AUDIT_LOG
+        WHERE COMPANY_ID = :companyId AND IS_DELETE='N' ORDER BY HRP_OPERATION_TIMESTAMP DESC, COMPANY_ID, FIRST_NAME, LAST_NAME
+    </sql-query>
+
+    <sql-query name="SQL.NewHire.hrp.audit.select.by.rownum">
+        SELECT * FROM (SELECT PERSONID,FIRST_NAME,LAST_NAME,SSN,COMPANY_ID,BROKER_TRX_ID,HRP_TO_PS_STATUS,PS_TO_HRP_STATUS,HRP_OPERATION_TIMESTAMP,UNIQUEID from NEW_HIRE_AUDIT_LOG
+        WHERE IS_DELETE='N' ORDER BY HRP_OPERATION_TIMESTAMP DESC, COMPANY_ID, FIRST_NAME, LAST_NAME) where rownum &lt; 101
+    </sql-query>
+
+    <sql-query name="SQL.NewHire.hrp.audit.select.xml">
+        SELECT HRP_TO_PS_XML from NEW_HIRE_AUDIT_LOG
+        where UNIQUEID =:uniqueId
+    </sql-query>
+
+    <sql-query name="SQL.NewHire.hrp.audit.delete">
+        UPDATE  NEW_HIRE_AUDIT_LOG SET IS_DELETE='Y'
+        where UNIQUEID =:uniqueId
+    </sql-query>
+
+    <sql-query name="SQL.NewHire.hrp.newhire.global.companies">
+        select org_desc
+        from orgs o, org_options oo
+        where o.orgid = :companyId
+        and sysdate between o.effdt and o.enddt
+        and sysdate between oo.effdt and oo.enddt
+        and o.org_level = '1'
+        and oo.t2_comp_term_dt is null
+        and o.orgid = oo.orgid
+    </sql-query>
+
+    <sql-query name="SQL.NewHire.hrp.newhire.global.companies.insert">
+        INSERT INTO PS_T2_BULKEMPL_TBL
+        (EMPLID, EFFDT, EFFSEQ, COMPANY, NATIONAL_ID, FIRST_NAME, LAST_NAME, SEX, ADDRESS1, ADDRESS2,
+        ADDRESS3, CITY, COUNTRY_DESCR, T2_STATE1, COUNTRY, POSTAL, PHONE, EMAIL_ADDR, HIRE_DT, T2_JOB_TITLE1,
+        EMPL_STATUS, FULL_PART_TIME, COMPRATE, COMPRATE1_FREQ, CURRENCY_CD, BIRTHDATE, SUPERVISOR_ID,
+        T2_SUP_FIRST_NAME, T2_SUP_LAST_NAME, LOCATION, DEPTID, CONTACT_NAME, CONTACTPHONENBR,
+        TERMINATION_DT, TERMINATION_REASON, LASTUPDOPRID, LASTUPDDTTM)
+        VALUES
+        (:employeeId, TRUNC(SYSDATE), :effseq, :companyId, :nationalId, :firstName, :lastName, :sex, :address1,
+         :address2, :address3, :city, :countryDesc, :state, :country, :zipCode, :phone, :email, :hireDate,
+         :jobTitle, :employeeStatus, :fullPartTime, :compRate, :payType, :currency, :birthdate, :supervisorId,
+         :supervisorFirstName, :supervisorLastName, :locationId, :departmentId, :contactName, :contactPhone,
+         :terminationDate, :terminationReason, :operatorId,SYSDATE )
+    </sql-query>
+
+    <sql-query name="SQL.NewHire.hrp.newhire.global.companies.select.effseq">
+        SELECT EFFSEQ+1 FROM PS_T2_BULKEMPL_TBL
+        WHERE EMPLID = :employeeId AND COMPANY = :companyId
+        and effseq = (
+        select max(effseq) FROM PS_T2_BULKEMPL_TBL
+        WHERE EMPLID = :employeeId AND COMPANY = :companyId
+        )
+        AND EFFDT = trunc(SYSDATE)
+    </sql-query>
+
+    <sql-query name="SQL.NewHire.hrp.newhire.global.companies.validate.existence">
+        SELECT EMPLID FROM PS_T2_BULKEMPL_TBL
+        WHERE EMPLID = :employeeId AND COMPANY = :companyId
+    </sql-query>
+
+    <sql-query name="SQL.NewHire.hrp.newhire.global.companies.validate.department.id">
+        SELECT COMPANY
+        FROM PS_DEPT_TBL
+        where company = :companyId and deptid = :departmentId
+    </sql-query>
+
+    <sql-query name="SQL.NewHire.hrp.newhire.global.companies.validate.location.id">
+        SELECT LOCATION
+        FROM ps_location_tbl
+        where ESTABID = :companyId and location = :locationId
+    </sql-query>
+
+    <sql-query name="SQL.NewHire.hrp.newhire.global.companies.select.by.company">
+        SELECT EMPLID, NATIONAL_ID, FIRST_NAME, LAST_NAME, BIRTHDATE, ADDRESS1, ADDRESS2,
+        CITY, T2_STATE1, POSTAL, COUNTRY, PHONE, SEX, EMAIL_ADDR, HIRE_DT, LOCATION,
+        FULL_PART_TIME, COMPRATE1_FREQ, T2_JOB_TITLE1, CURRENCY_CD, COMPRATE,
+        DEPTID, EMPL_STATUS, SUPERVISOR_ID, T2_SUP_FIRST_NAME, T2_SUP_LAST_NAME,
+        CONTACT_NAME, CONTACTPHONENBR, TERMINATION_DT, TERMINATION_REASON
+        FROM PS_T2_BULKEMPL_TBL BT
+        WHERE BT.effseq =
+             (select max(BT1.effseq) from PS_T2_BULKEMPL_TBL BT1 where BT.company = BT1.company and BT.EMPLID = BT1.EMPLID)
+        AND BT.EFFDT =
+             (select max(BT1.EFFDT) from PS_T2_BULKEMPL_TBL BT1 where BT.company = BT1.company and BT.EMPLID = BT1.EMPLID)
+        and BT.COMPANY= :companyId
+        ORDER BY BT.EMPLID
+    </sql-query>
+
+    <sql-query name="SQL.NewHire.hrp.newhire.global.companies.select.user.name">
+        select name from name_vw where personid = :employeeId and rownum=1
+    </sql-query>
+
+    <sql-query name="SQL.NewHire.hrp.newhire.global.companies.select.company.total.workforce">
+        SELECT COUNT(*) FROM PS_T2_BULKEMPL_TBL BT
+        WHERE BT.effseq =
+        (select max(BT1.effseq) from PS_T2_BULKEMPL_TBL BT1 where BT.company = BT1.company and BT.EMPLID = BT1.EMPLID)
+        AND BT.EFFDT =
+        (select max(BT1.EFFDT) from PS_T2_BULKEMPL_TBL BT1 where BT.company = BT1.company and BT.EMPLID = BT1.EMPLID)
+        and BT.COMPANY= :companyId
+        ORDER BY BT.EMPLID
+    </sql-query>
+
+    <sql-query name="SQL.NewHire.hrp.newhire.global.companies.select.company.pf.client">
+        select pf_client from ps_t2_clientoption where company = :companyId
+    </sql-query>
+
+    <sql-query name="SQL.NewHire.hrp.newhire.global.companies.validate.user.roles">
+        select ORGID from allroles_vw
+        where  PERSONID = :personId
+        and (orgid = :companyId or ORGID='0000')
+        and S_ROLE in ('HRAdmin','HRSECURITY','HRAUTH','HRENTRY', 'TN_HELPDESK','TNDM','ADMIN')
+    </sql-query>
+
+    <sql-query name="SQL.NewHire.hrp.newhire.validate.user.roles">
+        select ORGID from allroles_vw
+        where  PERSONID = :personId
+        and orgid = :companyId
+        and S_ROLE in ('HRAUTH','HRENTRY')
+    </sql-query>
+
+    <sql-query name="SQL.NewHire.hrp.newhire.select.canadian.location.state">
+        select state from ps_location_tbl
+        where location = :locationId
+    </sql-query>
+
+    <sql-query name="SQL.NewHire.hrp.newhire.validate.if.ambrose.company">
+        select company from ps_t2_cloptn_effdt
+        where company =:companyId and (T2_REFERRER = 'AMB' OR T2_PEO_ID = 'AMB')
+    </sql-query>
+
+
+</hibernate-mapping>

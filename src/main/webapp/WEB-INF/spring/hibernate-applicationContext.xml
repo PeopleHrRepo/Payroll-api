@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:jee="http://www.springframework.org/schema/jee" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:p="http://www.springframework.org/schema/p" xmlns:tx="http://www.springframework.org/schema/tx"
+	xmlns:aop="http://www.springframework.org/schema/aop"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans  
+        http://www.springframework.org/schema/beans/spring-beans-3.0.xsd
+        http://www.springframework.org/schema/jee http://www.springframework.org/schema/jee/spring-jee-4.0.xsd
+        http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop-4.0.xsd
+        http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-4.0.xsd">
+        
+         <jee:jndi-lookup jndi-name="jdbc/hrdb_sysadm" id="psDataSource" expected-type="javax.sql.DataSource" />
+ 		<jee:jndi-lookup jndi-name="jdbc/hpdb_hrdb" id="hpdataSource" expected-type="javax.sql.DataSource" />
+  		<jee:jndi-lookup jndi-name="jdbc/pndb_seeker" id="pnDataSource" expected-type="javax.sql.DataSource" /> 
+	
+	<bean id="peoplesoft_sessionFactory"	class="org.springframework.orm.hibernate4.LocalSessionFactoryBean">
+		<property name="dataSource" ref="psDataSource"></property>
+		<property name="packagesToScan">
+			<list>
+				<value>com.payroll.entity</value>
+			</list>
+		</property>
+		<property name="mappingLocations">
+        	<list>
+            <value>classpath:NameQueries/*.xml</value>
+        	</list>
+    	</property>
+		<property name="hibernateProperties">
+			<props>
+				<prop key="hibernate.dialect">org.hibernate.dialect.Oracle10gDialect</prop>
+				<!-- <prop key="hibernate.hbm2ddl.auto">update</prop> -->
+				<prop key="hibernate.show_sql">true</prop>
+				<prop key="hibernate.format_sql">false</prop>
+				
+			</props>
+		</property>
+	</bean>
+	
+	<bean id="hrp_sessionFactory"	class="org.springframework.orm.hibernate4.LocalSessionFactoryBean">
+		<property name="dataSource" ref="hpdataSource"></property>
+		<property name="packagesToScan">
+			<list>
+				<value>com.payroll.entity</value>
+			</list>
+		</property>
+		<property name="mappingLocations">
+        	<list>
+            <value>classpath:NameQueries/*.xml</value>
+        	</list>
+    	</property>
+		<property name="hibernateProperties">
+			<props>
+				<prop key="hibernate.dialect">org.hibernate.dialect.Oracle10gDialect</prop>
+				<prop key="hibernate.show_sql">true</prop>
+				<prop key="hibernate.format_sql">false</prop>
+				
+			</props>
+		</property>
+	</bean>
+
+<!-- 	<bean id="hp_hibernateTemplate" class="org.springframework.orm.hibernate4.HibernateTemplate">
+		<property name="sessionFactory" ref="peoplesoftsessionFactory"></property>
+	</bean> -->
+	
+	<!-- <bean id="peoplesoft_hibernateTemplate" class="org.springframework.orm.hibernate4.HibernateTemplate">
+		<property name="sessionFactory" ref="peoplesoftsessionFactory"></property>
+	</bean>
+ -->
+
+	<bean id="transactionManager"
+		class="org.springframework.orm.hibernate4.HibernateTransactionManager">
+		<property name="sessionFactory" ref="peoplesoft_sessionFactory" />
+		<qualifier value="transactionManager" />
+	</bean>
+	
+	
+	<!-- <bean id="hrp_transactionManager"
+		class="org.springframework.orm.hibernate4.HibernateTransactionManager">
+		<property name="sessionFactory" ref="hrp_sessionFactory" />
+		<qualifier value="transactionManager" />
+	</bean> -->
+
+<tx:advice id="txAdvice" transaction-manager="transactionManager">
+		<tx:attributes>
+			<tx:method name="*" propagation="REQUIRED" read-only="false" />
+		</tx:attributes>
+	</tx:advice>
+
+	<aop:config>
+		<aop:advisor id="managerTx" advice-ref="txAdvice"
+			pointcut="execution(* com.payroll.dao.impl.*.*(..))" order="1" />
+	</aop:config>
+
+	
+
+</beans>  

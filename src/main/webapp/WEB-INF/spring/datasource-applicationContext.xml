@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:jdbc="http://www.springframework.org/schema/jdbc"
+  xmlns:jee="http://www.springframework.org/schema/jee"
+  xsi:schemaLocation="http://www.springframework.org/schema/jee http://www.springframework.org/schema/jee/spring-jee-3.1.xsd
+  		http://www.springframework.org/schema/jdbc http://www.springframework.org/schema/jdbc/spring-jdbc-3.1.xsd
+		http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-3.1.xsd">
+
+
+  
+
+<!-- StoredProcedure beans starts  -->
+	
+	<bean id="spInsertSpecialPayroll" class="com.ptg.payroll.db.sp.InsertSpecialPayroll">
+		<constructor-arg name="dataSource" ref="psDataSource"/>
+	</bean>
+	
+	<bean id="spDeleteSpecialPayroll" class="com.ptg.payroll.db.sp.DeleteSpecialPayroll">
+		<constructor-arg name="dataSource" ref="psDataSource"/>
+	</bean>
+	
+	<bean id="spGetPayrollGroups" class="com.ptg.payroll.db.sp.PayrollGroups">
+		<constructor-arg name="dataSource" ref="hpdataSource"/>
+	</bean>
+	
+	<bean id="spGetPayrollGroupsByRole" class="com.ptg.payroll.db.sp.PayrollGroupsByRole">
+		<constructor-arg name="dataSource" ref="psDataSource"/>
+	</bean>
+	
+	<bean id="spGetPayGroupByCompanyPerson" class="com.ptg.payroll.db.sp.PayGroupByCompanyPerson">
+		<constructor-arg name="dataSource" ref="psDataSource"/>
+	</bean>
+
+	<bean id="getUserCompanies" class="com.ptg.payroll.hrp.sp.GetUserCompaniesImpl">
+		<constructor-arg name="dataSource" ref="psDataSource"/>
+	</bean>
+	<bean id="payrollStagingPublishSP" class="com.ptg.payroll.db.sp.payroll.PayrollStagingPublishSP">
+		<constructor-arg name="dataSource" ref="psDataSource"/>
+	</bean>
+	
+	
+	<bean id="backendConfig" class="com.ptg.payroll.hrp.model.BackendConfig"/>
+	<bean id="httpclient" class="org.apache.commons.httpclient.HttpClient"/>
+	
+	<bean id="spGetDualCoverageElg" class="com.payroll.db.GetDualCoverageElg">
+		<constructor-arg name="dataSource" ref="psDataSource"/>
+	</bean>
+	
+	<bean id="spEmployeesLeaveAccrual" class="com.ptg.payroll.db.sp.payroll.EmployeesLeaveAccrualSP">
+		<constructor-arg name="dataSource" ref="psDataSource"/>
+	</bean>
+	
+	<bean id="spResetCoPayrollForEmployee" class="com.ptg.payroll.db.sp.payroll.ResetCoPayrollForEmployeeSP">
+		<constructor-arg name="dataSource" ref="psDataSource"/>
+	</bean>
+	<bean id="spUpdateAdditionalPayData" class="com.ptg.payroll.db.sp.payroll.UpdateAdditionalPaySP">
+		<constructor-arg name="dataSource" ref="psDataSource"/>
+	</bean>
+	
+	<bean id="spPayrollReInitialize" class="com.ptg.payroll.db.sp.payroll.PayrollReInitializeSP">
+		<constructor-arg name="dataSource" ref="psDataSource"/>
+	</bean>
+	
+	<bean id="spDeleteFromRsn1Table" class="com.ptg.payroll.db.sp.payroll.DeleteFromRsn1TableSP">
+		<constructor-arg name="dataSource" ref="psDataSource"/>
+	</bean>
+	<bean id="spVerifyPayrollReInitialize" class="com.ptg.payroll.db.sp.payroll.VerifyPayrollReInitializeSP">
+		<constructor-arg name="dataSource" ref="psDataSource"/>
+	</bean>
+	
+	<bean id="spInitializePayrollGroup" class="com.ptg.payroll.db.sp.InitializePayrollGroup">
+		<constructor-arg name="dataSource" ref="psDataSource"/>
+	</bean>
+	
+	<bean id="spInitializePayrollGroupNew" class="com.ptg.payroll.db.sp.InitializePayrollGroupNew">
+		<constructor-arg name="dataSource" ref="psDataSource"/>
+	</bean>
+	
+	<bean id="spUpdateSpecialPayrollPPData" class="com.ptg.payroll.db.sp.UpdateSpecialPayrollPPData">
+		<constructor-arg name="dataSource" ref="psDataSource"/>
+	</bean>
+	 
+<!-- StoredProcedure beans end  -->
+
+</beans>

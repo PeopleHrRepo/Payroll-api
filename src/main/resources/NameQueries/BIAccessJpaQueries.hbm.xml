@@ -1,0 +1,118 @@
+<?xml version="1.0"?>
+<!DOCTYPE hibernate-mapping PUBLIC "-//Hibernate/Hibernate Mapping DTD 3.0//EN"  "http://hibernate.sourceforge.net/hibernate-mapping-3.0.dtd">
+<!--
+    Common named JPA queries for BI Integration and Access.
+-->
+
+<hibernate-mapping>
+
+    <sql-query name="SQL.platform.access.company.search.by.id">
+        select o.orgid, org_desc
+        from orgs o, org_options oo
+        where (upper(o.orgid) = upper(:company) or lower(o.orgid) = lower(:company))
+        and o.orgid not in ('001','002')
+        and sysdate between o.effdt and o.enddt
+        and sysdate between oo.effdt and oo.enddt
+        and o.org_level = '1'
+        and oo.t2_comp_term_dt is null
+        and o.orgid = oo.orgid
+    </sql-query>
+
+    <sql-query name="SQL.platform.access.company.search.by.name">
+        select o.orgid, o.org_desc
+        from orgs o, org_options oo
+        where (upper(o.org_desc) like upper(:company) or lower(o.org_desc) like lower(:company))
+        and sysdate between o.effdt and o.enddt
+        and sysdate between oo.effdt and oo.enddt
+        and o.org_level = '1'
+        and oo.t2_comp_term_dt is null
+        and o.orgid = oo.orgid and rownum &lt;32 order by org_desc
+    </sql-query>
+
+    <sql-query name="SQL.platform.BIQLINK.access.company.search.employee.by.company.id.without.leaverequest.feature">
+        select  n.name, p.pers_key, sr.s_role
+        from ALLROLES_VW sr, name_vw n, person_keys p
+        where orgid = :companyId
+        and orgid not in ('001','002')
+        and n.personid=sr.personid
+        and n.personid=p.personid
+        and p.pers_key_type=2
+        and (s_role = 'STD_RPTS' or s_role = 'BI_ALERTS' or s_role = 'BRIO_RPTS')
+        order by name
+    </sql-query>
+
+    <sql-query name="SQL.platform.BIQLINK.access.company.search.employee.by.company.id.with.leaverequest.feature">
+        select n.name, p.pers_key, sr.s_role
+        from ALLROLES_VW sr, name_vw n, person_keys p
+        where orgid = :companyId
+        and orgid not in ('001','002')
+        and n.personid = sr.personid
+        and n.personid = p.personid
+        and p.pers_key_type=2
+        and (s_role = 'STD_RPTS' or s_role = 'BI_ALERTS' or s_role = 'BRIO_RPTS' or s_role='EPHRS' or s_role='EPTAG' or s_role='EPHNA')
+        order by name
+    </sql-query>
+
+    <sql-query name="SQL.platform.ACCSETUP.access.company.search.employee.by.company.id">
+        select n.name, p.pers_key, sr.s_role
+        from ALLROLES_VW sr, name_vw n, person_keys p
+        where orgid = :companyId
+        and orgid not in ('001','002')
+        and n.personid = sr.personid
+        and n.personid = p.personid
+        and p.pers_key_type=2
+        and (s_role = 'BRIO_RPTS')
+        order by name
+    </sql-query>
+
+    <sql-query name="SQL.platform.access.company.search.employee.by.company.id">
+        select n.name, sr.personid, sr.s_role from system_roles sr, name_vw n
+        where orgid = :companyId
+        and orgid not in ('001','002')
+        and n.personid=sr.personid
+        and sysdate between effdt and enddt
+        and (s_role = 'BI_USER' or s_role = 'BI_ALERTS')
+        order by name
+    </sql-query>
+
+    <sql-query name="SQL.platform.add.access.new.proxy">
+        INSERT INTO PLATFORM_USER_ACCESS_PROXY
+        (EMPLOYEE_ID, COMPANY_ID, PROXY_EMPLOYEE_ID, PROXY_COMPANY_ID, ACCESS_PLATFORM, CREATION_DATE, ACCESS_TYPE)
+        VALUES
+        (:employeeId, :companyId, :proxyEmployeeId, :proxyCompanyId, :accessPlatform, sysdate, :accessType)
+    </sql-query>
+
+    <sql-query name="SQL.platform.access.select.proxy.details">
+        select proxy_company_id, proxy_employee_id, access_type from PLATFORM_USER_ACCESS_PROXY
+        where company_id = :companyId and employee_id = :employeeId and access_platform = :accessPlatform
+    </sql-query>
+
+    <sql-query name="SQL.platform.access.proxy.select.employee.name">
+        select distinct n.name from system_roles sr, name_vw n
+        where sr.orgid = :companyId
+        and n.personid= :employeeId
+    </sql-query>
+
+    <sql-query name="SQL.platform.access.update.proxy.details">
+        UPDATE PLATFORM_USER_ACCESS_PROXY
+        SET PROXY_EMPLOYEE_ID = :proxyEmployeeId, PROXY_COMPANY_ID = :proxyCompanyId,
+        LAST_UPDATE_DATE = SYSDATE, ACCESS_TYPE = :accessType
+        WHERE COMPANY_ID = :companyId AND EMPLOYEE_ID = :employeeId and access_platform = :accessPlatform
+    </sql-query>
+
+    <sql-query name="SQL.platform.access.validate.company.leave.request">
+        SELECT orgid FROM component_setup_steps
+        WHERE orgid = :companyId
+        AND component_name = 'LEAVE_REQUEST'
+        AND component_value = 'Y'
+        AND SYSDATE BETWEEN EFFDT AND ENDDT
+    </sql-query>
+
+    <sql-query name="SQL.platform.company.search.pf.client.trinet">
+      select distinct(company) from PS_COMPANY_TBL where pf_client = '0000'
+    </sql-query>
+
+
+
+
+</hibernate-mapping>

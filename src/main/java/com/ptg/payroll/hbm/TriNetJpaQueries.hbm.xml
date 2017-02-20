@@ -1,0 +1,1360 @@
+<?xml version="1.0"?>
+<!DOCTYPE hibernate-mapping PUBLIC "-//Hibernate/Hibernate Mapping DTD 3.0//EN"  "http://hibernate.sourceforge.net/hibernate-mapping-3.0.dtd">
+<!--
+    Common named JPA queries for TriNet Open Enrollment.
+-->
+
+<hibernate-mapping>
+	<sql-query name="SQL.employmentVerification.isAmbroseCSA">
+		SELECT PP.PERSONID
+		FROM PERSON_POSITIONS PP,POSITION_DEFS PD
+		WHERE
+		PP.PERSONID = :personId AND
+		PP.APPROVAL_STAT = 'F' AND
+		TRUNC(SYSDATE) BETWEEN PP.EFFDT AND PP.ENDDT AND
+		PD.POSITIONID  = PP.POSITIONID AND
+		PD.COMPANY     = PP.COMPANY AND
+		PD.DEPTID IN ('0000AMBMGT', '0000AMBCLN') AND
+		PD.APPROVAL_STAT = 'F' AND
+		TRUNC(SYSDATE) BETWEEN PD.EFFDT and PD.ENDDT
+	</sql-query>
+	<sql-query name="SQL.newHireChecklist.getFirstPayrollDate">
+		SELECT MIN(T2_PP_REPORT_DT) FROM PS_T2_PAYROLL_HDR WHERE COMPANY = :company AND PAYGROUP = :payGroup AND  PAY_END_DT &gt;= :hireDate
+	</sql-query>
+	<sql-query name="SQL.newHireChecklist.getBenefitStartDate">
+		SELECT MIN(C.COVERAGE_BEGIN_DT)
+		FROM PS_JOB A, PS_BAS_PARTIC B, PS_BAS_PARTIC_PLAN C
+		WHERE a.emplid = :emplid
+		AND A.COMPANY = :company
+		AND A.EFFDT =
+		(SELECT MAX (A_ED.EFFDT)
+		FROM PS_JOB A_ED
+		WHERE A.EMPLID = A_ED.EMPLID
+		AND A.EMPL_RCD = A_ED.EMPL_RCD
+		AND (A_ED.ACTION IN ('HIR','REH') OR (A_ED.ACTION = 'DTA' OR A_ED.ACTION_REASON = 'CNV'))
+		AND A_ED.EFFDT &lt;= SYSDATE + 90)
+		AND A.EFFSEQ =
+		(SELECT MAX (A_ES.EFFSEQ)
+		FROM PS_JOB A_ES
+		WHERE A.EMPLID = A_ES.EMPLID
+		AND A.EMPL_RCD = A_ES.EMPL_RCD
+		AND A.ACTION = A_ES.ACTION
+		AND A.ACTION_REASON = A_ES.ACTION_REASON
+		AND A.EFFDT = A_ES.EFFDT)
+		AND (SUBSTR (B.SCHED_ID, 1, 3) = A.COMPANY OR SUBSTR (B.SCHED_ID, 4, 3) = A.COMPANY)
+		AND B.EMPLID = A.EMPLID
+		AND B.EVENT_ID =
+		(SELECT MAX (B_ED.EVENT_ID)
+		FROM PS_BAS_PARTIC B_ED
+		WHERE B.SCHED_ID = B_ED.SCHED_ID
+		AND B.EMPLID = B_ED.EMPLID
+		AND B.BENEFIT_RCD_NBR = B_ED.BENEFIT_RCD_NBR
+		AND ((B_ED.EVENT_STATUS = 'O'  AND B_ED.BAS_PROCESS_STATUS IN ('PR','ET','RE'))
+        	OR  (B_ED.EVENT_STATUS = 'C'  AND B_ED.BAS_PROCESS_STATUS IN ('FE')) )
+		AND B.JOB_EFFDT = B_ED.JOB_EFFDT)
+		AND C.SCHED_ID = B.SCHED_ID
+		AND C.EMPLID = B.EMPLID
+		AND C.BENEFIT_RCD_NBR = B.BENEFIT_RCD_NBR
+		AND C.EVENT_ID = B.EVENT_ID GROUP BY A.EMPLID
+    </sql-query>
+	<sql-query name="SQL.newHireChecklist.getHireDate">
+		SELECT
+       CASE
+          WHEN A.HIRE_DT &lt; A.LAST_HIRE_DT
+          THEN
+             A.LAST_HIRE_DT
+          ELSE
+             A.HIRE_DT
+       END
+          AS NHIRE_DT,
+       A.EMPL_RCD,
+       A.PAYGROUP,
+       A.ACTION_DT,
+       CASE
+          WHEN A.FULL_PART_TIME = 'F' and A.REG_TEMP = 'R'
+          THEN 'Y'
+          ELSE 'N'
+          END AS BEN_ELIGIBLE,
+       CASE
+          WHEN B.STATE in ('NY','DC') THEN B.STATE
+          ELSE 'NA'
+          END AS STATE,
+       A.REG_TEMP,
+       A.FULL_PART_TIME,
+       A.FLSA_STATUS
+  FROM PS_JOB A, PS_LOCATION_TBL B
+WHERE     A.EMPLID = :emplid
+        AND A.COMPANY = :company
+       AND A.EFFDT =
+              (SELECT MAX (A1.EFFDT)
+                 FROM PS_JOB A1
+                WHERE     A.EMPLID = A1.EMPLID
+                      AND A.EMPL_RCD = A1.EMPL_RCD
+                      AND A.COMPANY = A1.COMPANY)
+       AND A.EFFSEQ =
+              (SELECT MAX (A2.EFFSEQ)
+                 FROM PS_JOB A2
+                WHERE     A.EMPLID = A2.EMPLID
+                      AND A.EMPL_RCD = A2.EMPL_RCD
+                      AND A.COMPANY = A2.COMPANY
+                      AND A.EFFDT = A2.EFFDT)
+       AND A.LOCATION = B.LOCATION
+      AND B.EFFDT =
+      		(SELECT MAX(B1.EFFDT)
+      			FROM PS_LOCATION_TBL B1
+      			WHERE B1.LOCATION = B.LOCATION
+      			AND B1.EFFDT &lt;= A.EFFDT)
+    </sql-query>
+
+     <sql-query name="SQL.FSA.OE.BasPartic.CurrentPlans.limits">
+        Select plan_type, option_Cd, Annual_Pledge From Ps_Bas_Partic_Plan Where Emplid=:emplid And Plan_Type In ('60', '61', '67')
+        and Sched_Id=:sched_id And Event_Id=:event_id And Benefit_Rcd_Nbr=:benefit_rcd_nbr
+    </sql-query>
+
+    <sql-query name="SQL.CurrentBenefits.EmployeeName.findByEmplid">
+        select p.name
+        from   ps_person_name p
+        where  p.emplid = :emplid
+    </sql-query>
+
+    <sql-query name="SQL.CurrentBenefits.MedicalDentalVision.findByEmplidEmplRcd">
+        select  h.plan_type, h.xlatlongname, h.descr, h.group_nbr
+        from   ps_t2_nx_health_vw h
+        where  h.emplid = :emplid and h.empl_rcd =:emplRcd
+    </sql-query>
+
+    <sql-query name="SQL.CurrentFutureBenefits.MedicalDentalVision.findByEmplidEmplRcd">
+        select  h.plan_type, h.xlatlongname, h.descr, h.group_nbr
+        from   ps_t2_fut_hlth_vw h
+        where  h.emplid = :emplid and h.empl_rcd =:emplRcd and h.event_dt = :event_dt
+    </sql-query>
+
+
+    <sql-query name="SQL.CurrentBenefits.HealthBenefits.findByEmplidEmplRcd">
+        select h.plan_type, h.xlatlongname, h.descr, h.group_nbr
+        from   ps_t2_nx_health_vw h
+        where  h.emplid = :emplid and h.empl_rcd =:emplRcd
+    </sql-query>
+
+    <sql-query name="SQL.CurrentFutureBenefits.HealthBenefits.findByEmplidEmplRcd">
+        select h.plan_type, h.xlatlongname, h.descr, h.group_nbr
+        from   ps_t2_fut_hlth_vw h
+        where  h.emplid = :emplid and h.empl_rcd =:emplRcd and h.event_dt = :event_dt
+    </sql-query>
+
+    <sql-query name="SQL.CurrentBenefits.HealthBenefitsDependents.findByEmplidEmplRcd">
+       select   /*+ NO_CPU_COSTING */ d.plan_type, d.name
+       from     ps_t2_hlth_depn_vw d
+       where    d.emplid = :emplid and d.empl_rcd= :emplRcd and d.plan_type like '1%'
+       order by d.plan_type, d.name
+    </sql-query>
+
+    <sql-query name="SQL.CurrentFutureBenefits.HealthBenefitsDependents.findByEmplidEmplRcd">
+        select   /*+ NO_CPU_COSTING */ d.plan_type, d.name
+        from     ps_t2_fut_hldpn_vw d
+        where    d.emplid = :emplid and d.empl_rcd= :emplRcd and d.event_dt = :event_dt and d.plan_type like '1%'
+        order by d.plan_type, d.name
+    </sql-query>
+
+    <sql-query name="SQL.CurrentFutureBenefits.SuppLifeDepSuppADDSpouse.findByEmplidEmplRcd">
+        select   l.plan_type, l.xlatlongname, l.descr, l.calculated_base
+        from     ps_t2_fut_life_vw l
+        where    l.emplid = :emplid and l.empl_rcd= :emplRcd and l.event_dt = :event_dt
+        order by l.plan_type asc
+    </sql-query>
+
+    <sql-query name="SQL.CurrentSimpleBenefits.LegalPlans.findByEmplidEmplRcd">
+        select s.plan_type, s.xlatlongname, s.descr, s.group_nbr
+        from   ps_t2_smplbn_cu_vw s
+        where  s.emplid = :emplid and s.empl_rcd =:emplRcd
+    </sql-query>
+
+    <sql-query name="SQL.CurrentFutureSimpleBenefits.LegalPlans.findByEmplidEmplRcd">
+        select s.plan_type, s.xlatlongname, s.descr, s.group_nbr
+        from   ps_t2_smplbn_fu_vw s
+        where  s.emplid = :emplid and s.empl_rcd =:emplRcd and s.event_dt = :event_dt
+    </sql-query>
+
+    <sql-query name="SQL.CurrentBenefits.SuppLifeDepSuppADDSpouse.findByEmplidEmplRcd">
+        select    l.plan_type, l.xlatlongname, l.descr,
+        case when l.calculated_base = 0
+        then      l.FLAT_AMOUNT
+        else      l.calculated_base end as CALCULATED_BASE
+        from      ps_t2_nx_lifecr_vw l
+        where     l.emplid = :emplid and l.empl_rcd= :emplRcd
+        order by  l.plan_type asc
+    </sql-query>
+
+    <sql-query name="SQL.CurrentBenefits.SuppLifeDepSuppADDSpouseDependents.findByEmplidEmplRcd">
+        select   d.plan_type, d.dependent_benef, d.name,d.benef_pct, d.flat_amount,d.contingent
+        from     ps_t2_life_depn_vw d
+        where    d.emplid = :emplid and d.empl_rcd = :emplRcd
+        order by d.plan_type, d.dependent_benef, d.name asc
+    </sql-query>
+
+    <sql-query name="SQL.CurrentFutureBenefits.SuppLifeDepSuppADDSpouseDependents.findByEmplidEmplRcd">
+        select   d.plan_type, d.dependent_benef, d.name,d.benef_pct, d.flat_amount,d.contingent
+        from     ps_t2_fut_lfdpn_vw d
+        where    d.emplid = :emplid and d.empl_rcd = :emplRcd and d.event_dt = :event_dt
+        order by d.plan_type, d.dependent_benef, d.name asc
+    </sql-query>
+
+    <sql-query name="SQL.CurrentBenefits.ShortTermLongTermDisability.findByEmplid.old">
+        select d.plan_type,d.xlatlongname, d.descr, d.calculated_base
+        from   ps_t2_nx_disabl_vw d
+        where  d.emplid = :emplid
+    </sql-query>
+
+    <sql-query name="SQL.CurrentBenefits.ShortTermLongTermDisability.findByEmplid">
+        select disability_select.PLAN_TYPE_ID, disability_select.PLAN_TYPE PLAN_TYPE_NAME,
+               disability_select.PLAN_NAME,
+               to_char(round(
+                   case when
+                   (
+                       case when disability_select.country_view = 'US'
+                       then ((disability_select.CALCULATED_BASE * SAL_PCT))
+                       else (disability_select.CALCULATED_BASE)
+                       end
+                   ) > disability_select.MAXIMUM_MO_BENEFIT
+
+                   then (disability_select.MAXIMUM_MO_BENEFIT)
+                   else
+                   (
+                       case when disability_select.country_view = 'US'
+                       then ((disability_select.CALCULATED_BASE * SAL_PCT))
+                       else (disability_select.CALCULATED_BASE)
+                       end
+                   )
+               end,4), 'FM999999990D00') COVERAGE_AMOUNT
+        from
+        (
+            select
+            disability_plans.PLAN_TYPE PLAN_TYPE_ID, disability_plans.PlnTypName PLAN_TYPE,
+            disability_plans.DESCR PLAN_NAME,
+            --disability_plans.CALCULATED_BASE CALCULATED_BASE,
+            case when (disability_plans.CALCULATED_BASE = 0)
+            then  SEEKER.TRINET_API.fn_get_cur_partic_optn(disability_plans.emplid, disability_plans.plan_type, disability_plans.BENEFIT_PLAN, disability_plans.EMPL_RCD)
+            else disability_plans.CALCULATED_BASE
+            end  CALCULATED_BASE,
+            disability_plan.MAXIMUM_MO_BENEFIT,
+            disability_plan.USE_SAL_REPLACE,
+            disability_plan.SALARY_REPLACE_PCT,
+            SEEKER.TRINET_API.fn_get_eecountry('44Q') COUNTRY_VIEW,
+            case when (disability_plan.USE_SAL_REPLACE = 'Y')
+            then 1
+            else (nvl(disability_plan.SALARY_REPLACE_PCT, 0)/100)
+            end SAL_PCT
+            from
+            (
+                select
+                DISTINCT
+                t1.EMPLID, t1.EMPL_RCD, t1.PLAN_TYPE, t1.BENEFIT_NBR, t1.EFFDT, t1.DEDUCTION_END_DT,
+                t1.COVERAGE_BEGIN_DT, t1.COVERAGE_END_DT, t1.COVERAGE_ELECT, t1.COVERAGE_ELECT_DT, t1.BENEFIT_PLAN,
+                bv.DED_CLASS, bv.PAY_END_DT,
+                NVL(bv.CALCULATED_BASE, 0) as CALCULATED_BASE,
+                bv.DED_SLSTX_CLASS,
+                PlnTypNm.XLATLONGNAME as PlnTypName,
+                pln.DESCR
+                from ps_disability_ben t1, ps_benefits_vw bv, PSXLATITEM PlnTypNm, PS_BENEF_PLAN_TBL pln
+                where
+                t1.emplid =  :emplid
+                and t1.empl_rcd = :emplRcd
+                and t1.effdt = (select max(t2.effdt) from ps_disability_ben t2 where
+                t2.emplid = t1.emplid and  t2.empl_rcd = t1.empl_rcd and t2.plan_type = t1.plan_type
+                and t2.effdt &lt;= sysdate)
+                and t1.coverage_elect = 'E'
+                AND t1.emplid = bv.emplid(+)
+                AND t1.empl_rcd = bv.empl_rcd(+)
+                AND t1.PLAN_TYPE = bv.PLAN_TYPE(+)
+                AND t1.BENEFIT_PLAN = bv.BENEFIT_PLAN(+)
+                AND bv.DED_SLSTX_CLASS(+) = 'B'
+                AND PlnTypNm.fieldname = 'PLAN_TYPE' AND PlnTypNm.FIELDVALUE = t1.PLAN_TYPE
+                AND PlnTypNm.EFFDT = (select max(PlnTypNm2.effdt) from PSXLATITEM PlnTypNm2 where
+                PlnTypNm2.fieldname = PlnTypNm.fieldname and PlnTypNm2.FIELDVALUE = PlnTypNm.FIELDVALUE
+                and PlnTypNm2.effdt &lt;= sysdate)
+                AND t1.PLAN_TYPE = pln.PLAN_TYPE
+                AND t1.BENEFIT_PLAN = pln.BENEFIT_PLAN
+                AND pln.EFFDT = (select max(pln2.effdt) from PS_BENEF_PLAN_TBL pln2 where
+                pln2.PLAN_TYPE = pln.PLAN_TYPE and pln2.BENEFIT_PLAN = pln.BENEFIT_PLAN
+                and pln2.effdt &lt;= sysdate)
+            ) disability_plans
+            left join
+            (
+                select t1.*, t3.MAXIMUM_MO_BENEFIT as MAXIMUM_MO_BENEFIT
+                from PS_DISBLTY_PLN_TBL t1, PS_T2_MAX_MOBEN_VW t3
+                where --t1.plan_type = '30' and t1.benefit_plan = '000E2A'
+                --and
+                t1.effdt = (select max(t2.effdt) from PS_DISBLTY_PLN_TBL t2 where
+                t2.plan_type = t1.plan_type and t2.benefit_plan = t1.benefit_plan and t2.effdt &lt;= sysdate)
+                and t1.plan_type = t3.plan_type
+                and t1.benefit_plan = t3.benefit_plan
+                and t3.effdt = (select max(t4.effdt) from PS_T2_MAX_MOBEN_VW t4 where
+                t4.plan_type = t3.plan_type
+                and t4.benefit_plan = t3.benefit_plan
+                and t4.effdt &lt;= sysdate)
+                and t3.ben_effdt = (select max(t5.ben_effdt) from PS_T2_MAX_MOBEN_VW t5 where
+                t5.plan_type = t3.plan_type
+                and t5.benefit_plan = t3.benefit_plan
+                and t5.effdt &lt;= sysdate)
+            ) disability_plan
+                on disability_plans.plan_type = disability_plan.plan_type
+                and disability_plans.benefit_plan = disability_plan.benefit_plan
+            ) disability_select
+    </sql-query>
+
+    <sql-query name="SQL.CurrentFutureBenefits.confirmationId.findByEmplid">
+        SELECT * FROM PS_T2_OE_DFLT_EE WHERE SCHED_ID = (SELECT SCHED_ID FROM PS_BAS_PARTIC WHERE EMPLID = :emplid AND EVENT_ID = 0 AND EVENT_DT = :event_dt AND BENEFIT_RCD_NBR = :emplrcd)
+        AND EMPLID = :emplid AND EVENT_ID = 0 AND BENEFIT_RCD_NBR = :emplrcd
+    </sql-query>
+
+     <sql-query name="SQL.CurrentFutureBenefits.HsaPlans.findByEmplidSchedId">
+		Select C.Plan_Type_Descr As Descr, C.Plan_Type,Case When C.Flat_Contrb_Amt =0 Then 1 Else C.Flat_Contrb_Amt end As Min_Annual_Contrib,C.Max_Annual_Contrib, C.Option_Cd
+		From Ps_T2_Bpp_Mview A, Ps_T2_Oe_Hlth_Vw B, Ps_T2_Oe_Hsa_Vw C Where A.Sched_Id =:sched_id And A.Emplid =:emplid
+		And A.Plan_Type='10' And B.Plan_Type = A.Plan_Type And B.Sched_Id = A.Sched_Id And B.Emplid = A.Emplid
+		And B.Option_Cd = A.Option_Cd And C.Emplid = A.Emplid And C.Sched_Id = A.Sched_Id And C.Cntrl_Benefit_Plan = B.Benefit_Plan And C.Covrg_Cd = '1' and rownum = 1
+    </sql-query>
+
+     <sql-query name="SQL.CurrentFutureBenefits.FsaPlans.findByEmplidSchedId">
+		Select d.Descr,D.Plan_Type,d.Min_Annual_Contrib,d.Max_Annual_Contrib,d.Option_Cd From Ps_T2_Oe_Fsa_Vw D Where D.Sched_Id =:sched_id
+		And D.Emplid = :emplid And D.Benefit_Rcd_Nbr =:benefit_rcd_nbr And D.Event_Id = :event_id And D.Plan_Type In ('60', '61') And D.Option_Cd In ('DFS','LUP','HFS')  Order By D.Plan_Type,D.Option_Cd Desc
+    </sql-query>
+
+    <sql-query name="SQL.CurrentFutureBenefits.ShortTermLongTermDisability.findByEmplid">
+        select disability_select.PLAN_TYPE_ID, disability_select.PLAN_TYPE PLAN_TYPE_NAME,
+               disability_select.PLAN_NAME,
+               to_char(round(
+                   case when
+                   (
+                       case when disability_select.country_view = 'US'
+                       then ((disability_select.CALCULATED_BASE * SAL_PCT))
+                       else (disability_select.CALCULATED_BASE)
+                       end
+                   ) > disability_select.MAXIMUM_MO_BENEFIT
+
+                   then (disability_select.MAXIMUM_MO_BENEFIT)
+                   else
+                   (
+                       case when disability_select.country_view = 'US'
+                       then ((disability_select.CALCULATED_BASE * SAL_PCT))
+                       else (disability_select.CALCULATED_BASE)
+                       end
+                   )
+
+               end,4), 'FM999999990D00') COVERAGE_AMOUNT
+        from
+        (
+            select
+            disability_plans.PLAN_TYPE PLAN_TYPE_ID, disability_plans.PlnTypName PLAN_TYPE,
+            disability_plans.DESCR PLAN_NAME,
+            --disability_plans.CALCULATED_BASE CALCULATED_BASE,
+            case when (disability_plans.CALCULATED_BASE = 0)
+            then  SEEKER.TRINET_API.fn_get_fut_cur_partic_optn(disability_plans.emplid, disability_plans.plan_type, disability_plans.BENEFIT_PLAN, disability_plans.EMPL_RCD,disability_plans.event_dt)
+            else disability_plans.CALCULATED_BASE
+            end  CALCULATED_BASE,
+            disability_plan.MAXIMUM_MO_BENEFIT,
+            disability_plan.USE_SAL_REPLACE,
+            disability_plan.SALARY_REPLACE_PCT,
+            SEEKER.TRINET_API.fn_get_eecountry('44Q') COUNTRY_VIEW,
+            case when (disability_plan.USE_SAL_REPLACE = 'Y')
+            then 1
+            else (nvl(disability_plan.SALARY_REPLACE_PCT, 0)/100)
+            end SAL_PCT
+            from
+            (
+                select
+                DISTINCT
+                t1.EMPLID, t1.EMPL_RCD, t1.PLAN_TYPE, t1.BENEFIT_NBR, t1.EFFDT, t1.DEDUCTION_END_DT,
+                t1.COVERAGE_BEGIN_DT, t1.COVERAGE_END_DT, t1.COVERAGE_ELECT, t1.COVERAGE_ELECT_DT, t1.BENEFIT_PLAN,
+                NVL(0, 0) as CALCULATED_BASE,
+                PlnTypNm.XLATLONGNAME as PlnTypName,
+                pln.DESCR,bp.event_dt
+                from ps_disability_ben t1, PSXLATITEM PlnTypNm, PS_BENEF_PLAN_TBL pln,ps_bas_partic bp
+                where
+                t1.emplid =  :emplid
+                and t1.empl_rcd = :emplRcd
+                and bp.emplid = t1.emplid
+                and bp.empl_rcd = t1.empl_rcd
+                and bp.event_class = 'OE'
+                and bp.event_dt = :event_dt
+                and t1.effdt = (select max(t2.effdt) from ps_disability_ben t2 where
+                t2.emplid = t1.emplid and  t2.empl_rcd = t1.empl_rcd and t2.plan_type = t1.plan_type
+                and t2.effdt &lt;= bp.event_dt)
+                and t1.coverage_elect = 'E'
+
+                AND PlnTypNm.fieldname = 'PLAN_TYPE' AND PlnTypNm.FIELDVALUE = t1.PLAN_TYPE
+                AND PlnTypNm.EFFDT = (select max(PlnTypNm2.effdt) from PSXLATITEM PlnTypNm2 where
+                PlnTypNm2.fieldname = PlnTypNm.fieldname and PlnTypNm2.FIELDVALUE = PlnTypNm.FIELDVALUE
+                and PlnTypNm2.effdt &lt;= bp.event_dt)
+                AND t1.PLAN_TYPE = pln.PLAN_TYPE
+                AND t1.BENEFIT_PLAN = pln.BENEFIT_PLAN
+                AND pln.EFFDT = (select max(pln2.effdt) from PS_BENEF_PLAN_TBL pln2 where
+                pln2.PLAN_TYPE = pln.PLAN_TYPE and pln2.BENEFIT_PLAN = pln.BENEFIT_PLAN
+                and pln2.effdt &lt;= bp.event_dt)
+            ) disability_plans
+            left join
+            (
+                select t1.*, t3.MAXIMUM_MO_BENEFIT as MAXIMUM_MO_BENEFIT
+                from PS_DISBLTY_PLN_TBL t1, PS_T2_MAX_MOBEN_VW t3
+                where --t1.plan_type = '30' and t1.benefit_plan = '000E2A'
+                --and
+                t1.effdt = (select max(t2.effdt) from PS_DISBLTY_PLN_TBL t2 where
+                t2.plan_type = t1.plan_type and t2.benefit_plan = t1.benefit_plan and t2.effdt &lt;= :event_dt)
+                and t1.plan_type = t3.plan_type
+                and t1.benefit_plan = t3.benefit_plan
+                and t3.effdt = (select max(t4.effdt) from PS_T2_MAX_MOBEN_VW t4 where
+                t4.plan_type = t3.plan_type
+                and t4.benefit_plan = t3.benefit_plan
+                and t4.effdt &lt;= :event_dt)
+                and t3.ben_effdt = (select max(t5.ben_effdt) from PS_T2_MAX_MOBEN_VW t5 where
+                t5.plan_type = t3.plan_type
+                and t5.benefit_plan = t3.benefit_plan
+                and t5.effdt &lt;= :event_dt)
+            ) disability_plan
+            on disability_plans.plan_type = disability_plan.plan_type
+            and disability_plans.benefit_plan = disability_plan.benefit_plan
+        ) disability_select
+    </sql-query>
+
+    <sql-query name="SQL.CurrentBenefits.401KRothCombination.findByEmplidEmplRcd">
+        select f.plan_type, f.xlatlongname, f.descr, f.pct_gross, f.flat_ded_amt, f.pct_gross_atax, f.flat_ded_amt_atax
+        from   ps_t2_nx_401kcr_vw f
+        where  emplid = :emplid and empl_rcd =:emplRcd
+    </sql-query>
+
+    <sql-query name="SQL.CurrentFutureBenefits.401KRothCombination.findByEmplidEmplRcd">
+        select f.plan_type, f.xlatlongname, f.descr, f.pct_gross, f.flat_ded_amt, f.pct_gross_atax, f.flat_ded_amt_atax
+        from   ps_t2_fut_401k_vw f
+        where  emplid = :emplid and empl_rcd =:emplRcd and event_dt = :event_dt
+    </sql-query>
+
+    <sql-query name="SQL.CurrentBenefits.fsaHsaBenefits.findByEmplidEmplRcd">
+        select   f.plan_type, f.xlatlongname,f.descr, f.annual_pledge
+        from     ps_t2_nx_fsacr_vw f
+        where    f.emplid = :emplid and f.empl_rcd =:emplRcd
+        order by f.plan_type
+    </sql-query>
+
+    <sql-query name="SQL.CurrentFutureBenefits.fsaHsaBenefits.findByEmplidEmplRcd">
+        select   f.plan_type, f.xlatlongname,f.descr, f.annual_pledge
+        from     ps_t2_fut_fsacr_vw f
+        where    f.emplid = :emplid and f.empl_rcd =:emplRcd and f.event_dt = :event_dt
+        order by f.plan_type
+    </sql-query>
+
+    <sql-query name="SQL.CurrentBenefits.dependentDetails.findByEmplid">
+        select   d.emplid,
+                 d.name,
+                 case
+                 when d.address1 = 'EE_ADDRESS1' then p.address1
+                 else d.address1
+                 end,
+                 case
+                 when d.address2 = 'EE_ADDRESS2' then p.address2
+                 else d.address2
+                 end,
+                 case
+                 when d.address3 = 'EE_ADDRESS3' then p.address3
+                 else d.address3
+                 end,
+                 case
+                 when d.address4 = 'EE_ADDRESS4' then p.address4
+                 else d.address4
+                 end,
+                 case
+                 when d.city = 'EE_CITY' then p.city
+                 else d.city
+                 end,
+                 case
+                 when d.county = 'EE_COUNTY' then p.county
+                 else d.county
+                 end,
+                 case
+                 when d.state = 'EE_STATE' then p.state
+                 else d.state
+                 end,
+                 case
+                 when d.postal = 'EE_POSTAL' then p.postal
+                 else d.postal
+                 end,
+                 case
+                 when d.country = 'EE_COUNTRY' then p.country
+                 else d.country
+                 end,
+                 'XXX-XX-' || substr(national_id,6,4),
+                 d.xlatlongname,
+                 d.descr,
+                 d.birthdate,
+                 d.sex,
+                 d.mar_status,
+                 d.student
+        from     ps_t2_dep_pers_vw d, ps_t2_personal_vw p
+        where    d.emplid=p.emplid
+        and      p.emplid=:emplid
+        order by d.descr desc
+    </sql-query>
+
+    <sql-query name="SQL.CurrentFutureBenefits.dependentDetails.findByEmplid">
+        select   d.emplid,
+                 d.name,
+                 case
+                 when d.address1 = 'EE_ADDRESS1' then p.address1
+                 else d.address1
+                 end,
+                 case
+                 when d.address2 = 'EE_ADDRESS2' then p.address2
+                 else d.address2
+                 end,
+                 case
+                 when d.address3 = 'EE_ADDRESS3' then p.address3
+                 else d.address3
+                 end,
+                 case
+                 when d.address4 = 'EE_ADDRESS4' then p.address4
+                 else d.address4
+                 end,
+                 case
+                 when d.city = 'EE_CITY' then p.city
+                 else d.city
+                 end,
+                 case
+                 when d.county = 'EE_COUNTY' then p.county
+                 else d.county
+                 end,
+                 case
+                 when d.state = 'EE_STATE' then p.state
+                 else d.state
+                 end,
+                 case
+                 when d.postal = 'EE_POSTAL' then p.postal
+                 else d.postal
+                 end,
+                 case
+                 when d.country = 'EE_COUNTRY' then p.country
+                 else d.country
+                 end,
+                 'XXX-XX-' || substr(national_id,6,4),
+                 d.xlatlongname,
+                 d.descr,
+                 d.birthdate,
+                 d.sex,
+                 d.mar_status,
+                 d.student
+        from     ps_t2_dep_pers_vw d, ps_t2_fut_pers_vw p
+        where    d.emplid=p.emplid
+        and      p.emplid=:emplid
+        and      p.benefit_rcd_nbr = :emplRcd
+        order by d.descr desc
+    </sql-query>
+
+    <sql-query name="SQL.CurrentFutureBenefits.enrollmentDeadline">
+        select TO_CHAR(STARTDATE,'YYYY-MM-DD'),TO_CHAR(ENDDATE,'YYYY-MM-DD'),TO_CHAR(NEWPLNYRSTARTDT,'YYYY-MM-DD'),TO_CHAR(NEWPLNYRENDDT,'YYYY-MM-DD') from lkp_openenrollment where company = 'VES' and EVENT_CLASS='OE'
+    </sql-query>
+
+    <sql-query name="SQL.CurrentBenefits.employmentType">
+        SELECT FULL_PART_TIME FROM PS_JOB@hrdb_seeker J1
+			WHERE J1.EMPLID = :emplId
+			AND J1.EMPL_RCD = :emplRcd
+			AND J1.COMPANY = :company
+			AND J1.EFFDT = (SELECT MAX (J2.EFFDT) FROM PS_JOB@hrdb_seeker J2 WHERE J2.EMPLID = J1.EMPLID AND J2.EMPL_RCD = J1.EMPL_RCD AND J2.EFFDT &lt; SYSDATE + 90)
+			AND J1.EFFSEQ = (SELECT MAX (J3.EFFSEQ) FROM PS_JOB@hrdb_seeker J3 WHERE J3.EMPLID = J1.EMPLID AND J3.EMPL_RCD = J1.EMPL_RCD AND J3.EFFDT = J1.EFFDT)
+    </sql-query>
+
+    <!-- FSA/HSA Pay period cost related SQL  -->
+
+    <sql-query name="SQL.FsaHsa.FindPayFrequency">
+        select PG.PAY_FREQUENCY
+        from   PS_JOB JB, PS_PAYGROUP_TBL PG
+        where  JB.EMPLID = :emplId
+        AND    JB.EFFDT = (SELECT MAX(JB1.EFFDT) FROM PS_JOB JB1
+                           WHERE JB1.EMPLID = JB.EMPLID
+                           AND JB1.EMPL_RCD = JB.EMPL_RCD
+                           AND JB1.EFFDT &lt;= SYSDATE + 90)
+        AND    JB.EFFSEQ = (SELECT MAX(JB2.EFFSEQ) FROM PS_JOB JB2
+                            WHERE JB2.EMPLID = JB.EMPLID
+                            AND JB2.EMPL_RCD = JB.EMPL_RCD
+                            AND JB2.EFFDT = JB.EFFDT)
+        AND    JB.COMPANY = :companyId
+        AND    JB.COMPANY = PG.COMPANY
+        AND    JB.PAYGROUP = PG.PAYGROUP
+        AND    PG.EFFDT = (SELECT MAX(PG1.EFFDT) from PS_PAYGROUP_TBL PG1
+                            WHERE PG1.COMPANY = PG.COMPANY
+                            AND PG1.PAYGROUP = PG.PAYGROUP)
+    </sql-query>
+
+    <sql-query name="SQL.FsaHsa.FindBenefitPlanYearAndAmountElected">
+        select * from PS_T2_OE_FSA_VW FSA
+        where FSA.EMPLID = :emplId
+        and  FSA.EVENT_ID = (Select Max(EVENT_ID) from PS_T2_OE_FSA_VW FSA1
+                                        Where FSA1.SCHED_ID = FSA.SCHED_ID
+                                        and FSA1.EMPLID = FSA.EMPLID
+                                        and FSA1.BENEFIT_RCD_NBR = FSA.BENEFIT_RCD_NBR)
+        and FSA.PLAN_TYPE = :planType
+        and FSA.BENEFIT_PLAN = :benefitPlan
+    </sql-query>
+
+    <sql-query name="SQL.OE.PS.BcrBatchId.NextVal">
+        SELECT T2_BCR_BATCHID.NEXTVAL BcrBatchId FROM DUAL
+    </sql-query>
+
+    <sql-query name="SQL.NewHire.hrp.PersonId.NextVal">
+        SELECT PERSONID.NEXTVAL PERSONID FROM DUAL
+    </sql-query>
+
+    <sql-query name="SQL.NewHire.hrp.UniqueId.NextVal">
+        SELECT WP_HIRE_TN_ID.NEXTVAL UNIQUEID FROM DUAL
+    </sql-query>
+
+    <sql-query name="SQL.NewHire.hrp.AuditKey.NextVal">
+        SELECT AUDIT_LOGID.NEXTVAL AUDIT_KEY FROM DUAL
+    </sql-query>
+
+    <sql-query name="SQL.NewHire.hrp.NationalId.NextVal">
+        select nationalid_seq.nextval nationalId from dual
+    </sql-query>
+    
+    <sql-query name="SQL.NewHire.Duplicate.NationalId.Check">
+        select count(*) from ps_pers_nid where national_id = :nationalId
+    </sql-query>
+
+    <sql-query name="SQL.NewHire.hrp.ActionId.NextVal">
+        select actionid_seq.nextval actionId from dual
+    </sql-query>
+
+    <sql-query name="SQL.NewHire.hrp.TransactionId.NextVal">
+        select transactionid_seq.nextval transactionId from dual
+    </sql-query>
+
+    <sql-query name="SQL.NewHire.hrp.MessageId.NextVal">
+        select message_id_seq.nextval messageId from dual
+    </sql-query>
+
+    <sql-query name="SQL.NewHire.hrp.CompanyOlpId">
+        select  olp_id
+        from    olp_company_mapping_tbl
+        where   company = :companyId
+    </sql-query>
+
+    <sql-query name="SQL.NewHire.hrp.NotificationId.NextVal">
+        select notification_id_seq.nextval notificationId from dual
+    </sql-query>
+
+    <sql-query name="SQL.newhire.companyCountry">
+        SELECT substr(PF_CORP,4,2) FROM PS_T2_CLIENTOPTION WHERE company = :companyId  AND T2_COMP_TERM_DT IS NULL
+    </sql-query>
+
+    <sql-query name="SQL.newhire.userHrRoles">
+        SELECT LISTAGG(s_role, ',')
+        WITHIN GROUP (ORDER BY s_role)
+        FROM   allroles_vw
+        where  upper(s_role) in ('HRENTRY','HRAUTH', 'SPC_TA')
+        and    upper(orgid)= upper(:companyId)
+        and    personid=:personId
+        and    rownum=1
+    </sql-query>
+
+    <sql-query name="SQL.newhire.emplidFromPersonid">
+        SELECT PERS_KEY
+        FROM   PERSON_KEYS
+        WHERE  PERS_KEY_TYPE = '2'
+        AND    personId=:personId
+        AND    rownum=1
+    </sql-query>
+
+    <sql-query name="SQL.newhire.companyStatus">
+        select p.status
+        from olp_process_tbl p, olp_company_mapping_tbl m
+        where P.OLP_ID = m.olp_id
+        and P.STATUS = (select max(p1.status) from olp_process_tbl p1 where p1.olp_id = p.olp_id and p1.status &lt; 99 )
+        and P.status = 45
+        and m.company=upper(:companyId)
+    </sql-query>
+
+    <sql-query name="SQL.newhire.hrpWCCodes">
+        select NTANDYL wc_code from skr_company_workerscomp where company=:companyId and pf_client=:pfClient and state=:state and NTANDYL is not null
+        union
+        select NTANDNL wc_code from skr_company_workerscomp where company=:companyId and pf_client=:pfClient and state=:state and NTANDNL is not null
+        union
+        select YTANDNL wc_code from skr_company_workerscomp where company=:companyId and pf_client=:pfClient and state=:state and YTANDNL is not null
+        union
+        select YTANDYL wc_code from skr_company_workerscomp where company=:companyId and pf_client=:pfClient and state=:state and YTANDYL is not null
+        union
+        select ADDL1 wc_code from skr_company_workerscomp where company=:companyId and pf_client=:pfClient and state=:state and ADDL1 is not null
+        union
+        select ADDL2 wc_code from skr_company_workerscomp where company=:companyId and pf_client=:pfClient and state=:state and ADDL2 is not null
+        order by wc_code
+    </sql-query>
+
+    <sql-query name="SQL.newhire.hrp.wc.state">
+        Select distinct STATE_PROVINCE_CD
+        from   locations
+        where  LOCATION_CD = :location_cd
+        and    trunc(ENDDT) = to_date('12/31/2099','MM/DD/YYYY')
+    </sql-query>
+
+    <sql-query name="SQL.newhire.ps.wc.descs">
+        Select B.WORKERS_COMP_CD, B.DESCR
+        from   PS_PF_WC_TBL B
+        where  B.STATE = :state
+        AND    B.WORKERS_COMP_CD in (:wccodes)
+        AND    B.EFFDT = (
+        SELECT MAX(B_ED.EFFDT)
+        FROM   PS_PF_WC_TBL B_ED WHERE   B_ED.STATE = B.STATE)
+    </sql-query>
+
+    <sql-query name="SQL.newhire.hrauth">
+        select pp.personid || '|' || pp.positionid || '|' || pn.first_name || ' ' || pn.middle_name || ' ' ||  pn.name
+        from Position_Orgs po,Person_Positions pp, person_emplymnt pe, person_names pn
+        where po.position_org_rel = 'HRAUTH'
+        and po.orgid = :companyId
+        and po.positionid = pp.positionid
+        and po.company = pp.company
+        and sysdate between po.effdt and po.enddt
+        and po.approval_stat = 'F'
+        and sysdate between pp.effdt and pp.enddt
+        and pp.approval_stat = 'F'
+        and pe.personid = pp.personid
+        and pe.company = po.orgid
+        and sysdate between pe.effdt and pe.enddt
+        and pe.approval_stat = 'F'
+        and pe.emplymnt_status='A'
+        and pe.positionid = pp.positionid
+        and pp.personid = pn.personid
+    </sql-query>
+
+    <sql-query name="SQL.newhire.initiator">
+        select first_name || ' ' || middle_name || ' ' || name
+        from   person_names
+        where  personid= :personId
+        and    rownum &lt; 2
+    </sql-query>
+
+    <sql-query name="SQL.newhire.hrp.default.wc.code">
+        SELECT NTANDNL FROM SKR_COMPANY_WORKERSCOMP WHERE COMPANY = :companyId AND STATE = :state
+    </sql-query>
+
+    <sql-query name="SQL.newhire.hrp.messageseq">
+        select pubsubid.nextval from dual
+    </sql-query>
+
+    <sql-query name="SQL.newhire.ps.messageseq.update">
+        Update ps_t2_msg_seq_tbl set message_seq = :message_seq
+    </sql-query>
+
+    <sql-query name="SQL.company.hrp.policy.display">
+        select 1
+        from COMPONENT_SETUP_STEPS
+        where orgid =:company
+        and component_name =:componentName
+        and component_value = 'Y'
+        and sysdate between effdt and enddt
+    </sql-query>
+
+    <sql-query name="SQL.newhire.hrp.state.policy.notification.emaillist">
+        select b.url email_addr
+        from ORG_OPTIONS a, PERSON_ACCESSES b
+        where a.ORGID = :company
+        and hrp_sysdate between a.effdt and a.enddt
+        and hrp_sysdate between b.effdt and b.enddt
+        and b.approval_stat = 'F'
+        and a.t2_payroll_coord =b.personid
+        and b.access_type='Work' and b.media='Email'
+    </sql-query>
+
+    <sql-query name="SQL.newhire.hrp.org.notifications">
+        select decode(t1.url, null, decode(t2.url, null, t3.url, t2.url), t1.url) url,
+        decode(t4.pref_value,null,'Y',t4.pref_value) wf_send_email
+        from person_emplymnt t9, person_accesses t1, person_accesses t2,person_accesses t3, tn_empl_prefs t4
+        where t9.personid = :personId
+        and t9.positionid = :personId
+        and t9.approval_stat = 'F'
+        and hrp_sysdate between t9.effdt
+        and t9.enddt
+        and t1.personid(+) = t9.personid
+        and hrp_sysdate between t1.effdt(+)
+        and t1.enddt(+)
+        and t1.media(+) = 'Email'
+        and t1.access_type(+) = 'Work'
+        and t2.personid(+) = t9.personid
+        and hrp_sysdate between t2.effdt(+)
+        and t2.enddt(+)
+        and t2.media(+) = 'Email'
+        and t2.access_type(+) = 'Home'
+        and t3.personid(+) = t9.personid
+        and hrp_sysdate between t3.effdt(+)
+        and t3.enddt(+)
+        and t3.media(+) = 'Email'
+        and t3.access_type(+) = 'Other'
+        and t4.personid(+) = t9.personid
+        and hrp_sysdate between t4.effdt(+)
+        and t4.enddt(+)
+        and t4.pref_type(+)='WF_EMAIL'
+    </sql-query>
+
+    <sql-query name="SQL.newhire.hrp.notification.emaillist">
+        select rtrim (xmlagg (xmlelement (e, url1 || ',')).extract ('//text()'), ',') url from
+        (select  distinct decode(t1.url, null, decode(t2.url, null, t3.url, t2.url), t1.url) url1
+        from person_emplymnt t9, person_accesses t1, person_accesses t2,person_accesses t3, tn_empl_prefs t4
+        where  (t9.personid,t9.positionid) in (SELECT PCHK.PersonId,PO.PositionID
+        FROM Position_Orgs PO, Person_Positions PCHK, Position_Org_Rels POR, Orgs SO
+        WHERE SO.Orgid = :companyId
+        AND POR.Position_Org_Rel = PO.Position_Org_Rel
+        AND POR.S_Role = 'HRAUTH'
+        AND ((PO.Orgid = SO.Orgid)
+        OR (PO.Orgid = SO.Parent_Org))
+        AND PO.Approval_Stat = 'F'
+        AND trunc(sysdate) BETWEEN PO.EffDT
+        AND PO.EndDT
+        AND PCHK.PositionID = PO.PositionID
+        AND PCHK.Company = PO.Company
+        AND PCHK.Approval_Stat = 'F'
+        AND trunc(sysdate) BETWEEN PCHK.EffDT
+        AND PCHK.EndDT
+        AND trunc(sysdate) BETWEEN SO.EffDT
+        AND SO.EndDT)
+        and t9.approval_stat = 'F'
+        and hrp_sysdate between t9.effdt
+        and t9.enddt
+        and t1.personid(+) = t9.personid
+        and hrp_sysdate between t1.effdt(+)
+        and t1.enddt(+)
+        and t1.media(+) = 'Email'
+        and t1.access_type(+) = 'Work'
+        and t2.personid(+) = t9.personid
+        and hrp_sysdate between t2.effdt(+)
+        and t2.enddt(+)
+        and t2.media(+) = 'Email'
+        and t2.access_type(+) = 'Home'
+        and t3.personid(+) = t9.personid
+        and hrp_sysdate between t3.effdt(+)
+        and t3.enddt(+)
+        and t3.media(+) = 'Email'
+        and t3.access_type(+) = 'Other'
+        and t4.personid(+) = t9.personid
+        and hrp_sysdate between t4.effdt(+)
+        and t4.enddt(+)
+        and t4.pref_type(+)='WF_EMAIL')
+    </sql-query>
+
+    <sql-query name="SQL.lkp.batch.insert">
+        insert into lkp_batch(BATCH_ID,DATE_TIMESTAMP,CREATEDBY) VALUES (:batch_id,:sy_date,'BCRPROJECT')
+    </sql-query>
+
+    <sql-query name="SQL.newhire.ps.company.ea.date">
+        Select T2_EA_DATE
+        from   PS_T2_CLIENTOPTION
+        where  company = :company
+    </sql-query>
+
+    <sql-query name="SQL.newhire.ps.company.live.date">
+        select T2_COMP_LIVE_DT
+        from   ps_t2_clientoption
+        where  pf_client = :pfClient
+        and    company   = :company
+    </sql-query>
+
+    <sql-query name="SQL.newhire.ohiopolicies">
+        select STATE as state, T2_POLICY_NBR as policyNumber
+        from PS_T2_WC_CLNT_POL a
+        where a.EFFDT = (select max(a1.EFFDT) from PS_T2_WC_CLNT_POL a1
+        where a1.PF_CLIENT = a.PF_CLIENT
+        and a1.COMPANY = a.COMPANY
+        and a1.STATE = a.STATE
+        and a1.EFF_STATUS = a.EFF_STATUS
+        and a1.EFFDT &lt;= sysdate)
+        and a.EFF_STATUS = 'A' and COMPANY = :company
+    </sql-query>
+
+    <sql-query name="SQL.expensecloud.message.select.seq">
+        SELECT EXPENSE_CLOUD_MESSAGE_ID_SEQ.NEXTVAL FROM DUAL
+    </sql-query>
+
+    <sql-query name="SQL.expensecloud.message.insert">
+        INSERT INTO EXPENSE_CLOUD_MESSAGE(MESSAGE_ID, EXPENSE_SYSTEM, STATUS, TIME_STAMP, SUBMITTER_EMPLID, JSON_REQUEST)
+        VALUES(:messageId, :expenseSystem, :status, :timeStamp, :emplid, :jsonRequest)
+    </sql-query>
+
+    <sql-query name="SQL.expensecloud.message.details.insert">
+        INSERT INTO EXPENSE_CLOUD_MESSAGE_DETAILS(MESSAGE_ID,REPORT_ID,REPORT_NAME,COMPANY_ID,EMPLID,EMPL_RCD,
+        MIN_EXPENSE_DATE,MAX_EXPENSE_DATE,STATUS,MESSAGE,TIME_STAMP)
+        VALUES(:messageId, :reportId, :reportName, :companyId, :emplId, :empl_rcd, :minExpenseDate,
+        :maxExpenseDate, :status, :message, :timeStamp)
+    </sql-query>
+
+    <sql-query name="SQL.FsaHsa.FindRemainingPeriods">
+        select Count(*) from PS_PAY_CALENDAR CAL where
+        CAL.COMPANY = :companyId
+        AND CAL.PAYGROUP = :payGroup
+        AND PAY_END_DT between (case when :payBeginDate > sysdate then :payBeginDate else sysdate end )  and :payEndDate
+        AND PAY_PERIOD NOT IN (case when cal.PAYGROUP!='W' then '3' else '5' end)
+        AND PAY_OFF_CYCLE='N'
+    </sql-query>
+
+    <sql-query name="SQL.FsaHsa.FindDeductionYTD">
+        select max(ded_ytd)
+        from   ps_deduction_bal
+        where  emplid=:emplId
+        and    balance_id = :balanceId
+        and    balance_year=:balanceYear
+        and    plan_type=:planType
+        and    ded_class='B'
+    </sql-query>
+
+    <sql-query name="SQL.newhire.companyLiveDate">
+        SELECT to_char(trunc(T2_COMP_LIVE_DT),'MM/DD/YYYY') FROM PS_T2_CLOPTN_EFFDT A WHERE A.COMPANY = :companyId
+        AND EFFDT = (SELECT MAX(B.EFFDT) FROM PS_T2_CLOPTN_EFFDT B WHERE A.COMPANY = B.COMPANY
+                           AND A.PF_CLIENT = B.PF_CLIENT
+                           AND B.EFFDT &lt;= SYSDATE)
+    </sql-query>
+
+    <sql-query name="SQL.lsc.psjob.eligconfig1">
+        SELECT a.elig_config1
+        FROM PS_JOB A WHERE  A.EMPLID = :emplId and A.EMPL_RCD = :emplRcd    AND A.EFFDT =
+        (SELECT MAX(A_ED.EFFDT) FROM PS_JOB A_ED
+        WHERE A.EMPLID = A_ED.EMPLID
+        AND A.EMPL_RCD = A_ED.EMPL_RCD
+        AND A_ED.EFFDT &lt;= SYSDATE + 90)
+        AND A.EFFSEQ =
+        (SELECT MAX(A_ES.EFFSEQ) FROM PS_JOB A_ES
+        WHERE A.EMPLID = A_ES.EMPLID
+        AND A.EMPL_RCD = A_ES.EMPL_RCD
+        AND A.EFFDT = A_ES.EFFDT)
+    </sql-query>
+
+    <sql-query name="SQL.expensecloud.message.details.status.update">
+        UPDATE EXPENSE_CLOUD_MESSAGE_DETAILS
+        SET STATUS = :status,PAY_PERIOD_END_DT = :payPeriodEndDt, PAYGROUP = :payGroup
+        WHERE MESSAGE_ID = :messageId AND REPORT_ID = :reportId  AND EMPLID = :emplId
+    </sql-query>
+
+    <sql-query name="SQL.expensecloud.report.details.insert">
+        INSERT INTO EXPENSE_CLOUD_REPORT_DETAILS(MESSAGE_ID,REPORT_ID,EARN_CODE,AMOUNT)
+        VALUES(:messageId, :reportId, :earnCode, :amount)
+    </sql-query>
+
+    <sql-query name="SQL.expensecloud.message.status">
+        SELECT REPORT_ID, STATUS FROM EXPENSE_CLOUD_MESSAGE_DETAILS WHERE MESSAGE_ID = :messageId
+    </sql-query>
+
+    <sql-query name="SQL.expensecloud.report.status">
+        SELECT MESSAGE_ID, STATUS FROM EXPENSE_CLOUD_MESSAGE_DETAILS WHERE REPORT_ID = :reportId
+    </sql-query>
+
+    <sql-query name="SQL.expensecloud.company.report">
+        SELECT  DISTINCT XC.REPORT_NAME, XC.EMPLID, XC.STATUS, XC.MIN_EXPENSE_DATE,
+        XC.MAX_EXPENSE_DATE, XC.MESSAGE_ID, XC.REPORT_ID, EM.NAME
+        FROM EXPENSE_CLOUD_MESSAGE_DETAILS XC, PS_EMPLOYEES EM
+        WHERE XC.COMPANY_ID= :companyId
+        AND XC.EMPLID = EM.EMPLID
+        AND EM.PAYGROUP= :payGroup
+        AND (XC.STATUS='NEW' OR XC.STATUS='MOVED')
+        ORDER BY EM.NAME ASC
+    </sql-query>
+
+    <sql-query name="SQL.expensecloud.company.report.by.deptid">
+        SELECT  DISTINCT XC.REPORT_NAME, XC.EMPLID, XC.STATUS, XC.MIN_EXPENSE_DATE,
+        XC.MAX_EXPENSE_DATE, XC.MESSAGE_ID, XC.REPORT_ID, EM.NAME
+        FROM EXPENSE_CLOUD_MESSAGE_DETAILS XC, PS_EMPLOYEES EM
+        WHERE XC.COMPANY_ID= :companyId
+        AND XC.EMPLID = EM.EMPLID
+        AND EM.PAYGROUP= :payGroup
+        AND EM.DEPTID= :deptid
+        AND (XC.STATUS='NEW' OR XC.STATUS='MOVED')
+        ORDER BY EM.NAME ASC
+    </sql-query>
+
+    <sql-query name="SQL.expensecloud.company.report.by.location">
+        SELECT  DISTINCT XC.REPORT_NAME, XC.EMPLID, XC.STATUS, XC.MIN_EXPENSE_DATE,
+        XC.MAX_EXPENSE_DATE, XC.MESSAGE_ID, XC.REPORT_ID, EM.NAME
+        FROM EXPENSE_CLOUD_MESSAGE_DETAILS XC, PS_EMPLOYEES EM
+        WHERE XC.COMPANY_ID= :companyId
+        AND XC.EMPLID = EM.EMPLID
+        AND EM.PAYGROUP= :payGroup
+        and EM.LOCATION= :location
+        AND (XC.STATUS='NEW' OR XC.STATUS='MOVED')
+        ORDER BY EM.NAME ASC
+    </sql-query>
+
+    <sql-query name="SQL.expensecloud.company.expense.detail">
+        SELECT EARN_CODE, AMOUNT
+        FROM EXPENSE_CLOUD_REPORT_DETAILS
+        WHERE MESSAGE_ID= :messageId AND REPORT_ID= :reportId
+    </sql-query>
+
+    <sql-query name="SQL.expensecloud.earnings.codes">
+        SELECT DISTINCT DESCR FROM EARNINGS_TBL WHERE  EARN_CODE= :earnCode
+        AND EFF_STATUS='A' AND SYSTEM='PS'
+        AND EFFDT=(SELECT MAX(EFFDT) FROM EARNINGS_TBL WHERE  EARN_CODE= :earnCode
+        AND EFF_STATUS='A' AND SYSTEM='PS')
+    </sql-query>
+
+    <sql-query name="SQL.expensecloud.earnings.select.code.desc">
+        SELECT DISTINCT CODE_DESCR FROM EARNINGS_TBL WHERE  EARN_CODE= :earnCode
+        AND EFF_STATUS='A' AND SYSTEM='PS'
+        AND EFFDT=(SELECT MAX(EFFDT) FROM EARNINGS_TBL WHERE  EARN_CODE= :earnCode AND SYSTEM='PS')
+    </sql-query>
+
+    <sql-query name="SQL.expensecloud.employee.details">
+        SELECT A.EMPL_RCD,B.PAYGROUP,C.PAY_FREQUENCY,B.DEPTID,B.EMPL_STATUS,A.US_WORK_ELIGIBILTY,B.LOCATION,A.FIRST_NAME,A.LAST_NAME
+        FROM PS_EMPLOYEES A,PS_JOB B,PS_PAYGROUP_TBL C
+        WHERE   A.EMPLID = B.EMPLID
+                AND A.EMPL_RCD = B.EMPL_RCD
+                AND B.COMPANY = :compId
+                AND B.EMPLID = :emplId
+                AND B.EFFSEQ = (SELECT MAX(B2.EFFSEQ) FROM PS_JOB B2
+                WHERE B.EMPLID = B2.EMPLID
+                AND B.EMPL_RCD = B2.EMPL_RCD
+                AND B.EFFDT   = B2.EFFDT)
+                AND B.COMPANY = C.COMPANY
+                AND B.PAYGROUP = C.PAYGROUP
+                AND B.EFFDT   = (SELECT MAX(B3.EFFDT) FROM PS_JOB B3
+                WHERE B3.COMPANY = :compId
+                AND B3.emplid = :emplId
+                )
+        and rownum=1
+    </sql-query>
+
+    <sql-query name="SQL.expensecloud.employee.hours.insert">
+        INSERT INTO EMPLOYEE_HOURS_TBL (EMPLID, EMPL_RCD, COMPANY, PAY_PERIOD_END_DT, PAYGROUP, PAY_FREQ,
+        DEPTID, EARN_CODE,SEPCHK, HOURS_DOLLARS, ROW_STATUS,DISTR_SPLIT, OPRID,SPECIAL_PROCESS, PAY_PERIOD_START_DT,
+        EMPL_STATUS, COPY_HOURS_DOLLARS, CHECK_OR_ADVICE, GROSSUP,IS_EXPENSE_CLOUD)
+        VALUES (:emplId, :emplRcd, :companyId, :payPeriodEndDate, :payGroup, :payFreq, :deptId, :earnCode, :sepChk,
+        :hoursDollars, :rowStatus, :distSplit, :oprId, :specialProcess, :payPeriodStartDate, :emplStatus,
+        :copyHoursDollars, :checkOrAdvice, :grossUp, :isExpenseCloud)
+    </sql-query>
+
+    <sql-query name="SQL.expensecloud.employee.hours.delete">
+        DELETE FROM EMPLOYEE_HOURS_TBL
+        WHERE EMPLID = :emplId and EMPL_RCD = :emplRcd
+        and COMPANY = :companyId and PAY_PERIOD_END_DT = :payPeriodEndDate and PAYGROUP = :payGroup
+        and PAY_FREQ = :payFreq and DEPTID = :deptId and EARN_CODE = :earnCode
+    </sql-query>
+
+    <sql-query name="SQL.expensecloud.employee.sepchk.delete">
+        delete EMPLOYEE_SEPCHECK_TBL
+        where EMPLID = :emplId
+        and empl_rcd = :emplRcd
+        and company = :companyId
+        and paygroup = :payGroup
+        and pay_freq = :payFreq
+        and PAY_PERIOD_END_DT = :payPeriodEndDt
+    </sql-query>
+
+    <sql-query name="SQL.expensecloud.employee.sepchk.earncode.delete">
+        delete EMPLOYEE_SEPCHECK_EARNCODE_TBL
+        where  EMPLID = :emplId
+        and EMPL_RCD = :emplRcd
+        and COMPANY = :companyId
+        and PAY_PERIOD_END_DT = :payPeriodEndDt
+        and PAY_FREQ = :payFreq
+        and DEPTID = :deptid
+        and EARN_CODE = :earnCode
+    </sql-query>
+
+    <sql-query name="SQL.expensecloud.employee.validate.pay.period">
+        select sp.company from sub_process_tbl sp, EMPLOYEE_TBL et
+        where sp.company = :companyId and sp.pay_period_end_dt = :payPeriodEndDate
+        and et.EMPLID = :emplId AND et.COMPANY = :companyId
+        AND EFFDT=(
+        SELECT MAX(EFFDT)
+        FROM EMPLOYEE_TBL
+        WHERE EMPLID = :emplId AND COMPANY = :companyId )
+        and sp.paygroup = et.paygroup
+    </sql-query>
+
+    <sql-query name="SQL.expensecloud.token.validate">
+        SELECT TOKEN FROM HRP_SECURITY_TOKENS
+        WHERE CLIENT_ID='expcld' AND TRINET_APP_ID='hrpassword'
+    </sql-query>
+
+    <sql-query name="SQL.expensecloud.validate.expense.on.paysheet">
+        select EMPLID from EMPLOYEE_HOURS_TBL
+        where EMPLID = :emplid
+        and EMPL_RCD = :emplRcd
+        and COMPANY = :companyId
+        and PAY_PERIOD_END_DT = :payPeriodEndDate
+        and PAYGROUP = :paygroup
+        and PAY_FREQ = :payFreq
+        and DEPTID = :deptid
+        and EARN_CODE = :earnCode
+        and IS_EXPENSE_CLOUD IS NULL
+    </sql-query>
+
+    <sql-query name="SQL.expensecloud.select.paysheet.expense.amount">
+        select IS_EXPENSE_CLOUD,HOURS_DOLLARS from EMPLOYEE_HOURS_TBL
+        where EMPLID = :emplid
+        and EMPL_RCD = :emplRcd
+        and COMPANY = :companyId
+        and PAY_PERIOD_END_DT = :payPeriodEndDate
+        and PAYGROUP = :paygroup
+        and PAY_FREQ = :payFreq
+        and DEPTID = :deptid
+        and EARN_CODE = :earnCode
+    </sql-query>
+
+    <sql-query name="SQL.expensecloud.validate.expense.update.paysheet.expense">
+        update EMPLOYEE_HOURS_TBL
+        set HOURS_DOLLARS = :hoursDollars, IS_EXPENSE_CLOUD='Y', CHECK_OR_ADVICE='D', SEPCHK = 0
+        where EMPLID = :emplid
+        and EMPL_RCD = :emplRcd
+        and COMPANY = :companyId
+        and PAY_PERIOD_END_DT = :payPeriodEndDate
+        and PAYGROUP = :paygroup
+        and PAY_FREQ = :payFreq
+        and DEPTID = :deptid
+        and EARN_CODE = :earnCode
+    </sql-query>
+
+    <sql-query name="SQL.expensecloud.validate.company.expense.code.exists">
+        SELECT code_descr
+        FROM EARN_CODE_TBL
+        WHERE COMPANY = :companyId
+        AND code_descr = :earnCode
+        AND EFFDT =
+        (SELECT MAX (EFFDT)
+        FROM EARN_CODE_TBL
+        WHERE company = :companyId
+        AND code_descr = :earnCode)
+    </sql-query>
+
+    <sql-query name="SQL.expensecloud.validate.employee.payroll.role">
+        SELECT orgid FROM allroles_vw t1, person_keys t2
+        WHERE  t1.personid = t2.personid
+        AND T1.ORGID =:companyId
+        AND t2.pers_key_type = '2'
+        AND T1.s_role = 'EPTAG'
+        AND t2.pers_key =:emplId
+        AND t1.deptid='***'
+        AND t1.location='***'
+    </sql-query>
+
+    <sql-query name="SQL.trinet.employee.companies">
+        SELECT DISTINCT E.COMPANY, O.ORG_DESC
+        FROM PERSON_EMPLYMNT E, ORGS O
+        WHERE E.PERSONID = :personId
+        AND E.COMPANY= O.ORGID
+    </sql-query>
+
+    <sql-query name="SQL.trinet.employee.validate.leave.of.absence">
+        SELECT a.Empl_Status FROM EMPLOYEE_TBL a
+        WHERE a.EMPLID = :employeeId
+        AND a.EMPL_RCD = :employeeRcd
+        AND a.EFFDT = (SELECT MAX(a1.EFFDT) FROM EMPLOYEE_TBL a1
+        WHERE a1.EMPLID = a.EMPLID
+        AND a1.EMPL_RCD = a.EMPL_RCD
+        AND a1.EFFDT &lt;= :payBeginDate
+        AND a1.COMPANY = a.COMPANY)
+        AND a.COMPANY = :companyId
+        AND a.EMPL_STATUS = 'L'
+    </sql-query>
+
+    <sql-query name="SQL.enrollment.hsa.limits">
+        SELECT EE_ONLY_COVERAGE,FAMILY_COVERAGE,CATCH_UP_EXTENSION FROM SYSADM.PS_HSA_IRS_LIMITS
+        WHERE CALENDAR_YEAR = :calendarYear
+    </sql-query>
+
+    <sql-query name="SQL.enrollment.hsa.frontload">
+        select T2_ER_HSA_FRT_FAM, T2_ER_HSA_FRT_EE, T2_HSA_FRT_PAYOUT from PS_T2_CLIENT_OPTN2 a
+        where a.effdt=(select max(b.effdt) from PS_T2_CLIENT_OPTN2 b where b.benefit_program = :benefitProgram and
+        (b.effdt &lt;= sysdate + 90 OR b.effdt = :eventDt)) and a.benefit_program = :benefitProgram
+    </sql-query>
+
+    <sql-query name="SQL.enrollment.hsa.coverage.begin.date">
+        select max(coverage_begin_dt) from PS_T2_OE_PLAN_DATA where emplid= :employeeId and plan_type='67'
+        and event_id= :eventID and event_dt = :eventDt
+    </sql-query>
+
+    <sql-query name="SQL.enrollment.hsa.validate.employee.selected.dependents">
+        select * from PS_T2_OE_PLAN_DATA
+        where emplid= :employeeId
+        and is_deleted='N' and plan_type in ('10', '15')
+    </sql-query>
+
+    <sql-query name="SQL.enrollment.hsa.validate.oe.plan.start.date">
+        select (plan_dt_start)
+        from person_positions t2, bd_qtr_oe_setup t3, org_options t4, person_keys t5
+        where t5.pers_key = :employeeId
+        AND t2.empl_rcd = :employeeRcd
+        AND t2.personid = t5.personid
+        AND t5.pers_key_type = '2'
+        AND t2.company = t4.orgid
+        AND sysdate + 90 between t4.effdt and t4.enddt
+        AND sysdate + 90 between t2.effdt and t2.enddt
+        and t2.approval_stat = 'F'
+        AND t4.t2_oe_quarter = t3.t2_oe_quarter
+        AND sysdate + 90 between t3.cur_plan_dt_start and t3.cur_plan_dt_end
+    </sql-query>
+
+    <sql-query name="SQL.benefit.enrollment.find.ui.dependents">
+        SELECT d.SCHED_ID, d.EMPLID, d.BENEFIT_RCD_NBR, d.EVENT_ID, d.ACTION, d.DEPENDENT_BENEF, d.RELATIONSHIP,
+        d.DEP_BENEF_TYPE, d.FIRST_NAME, d.MIDDLE_NAME, d.LAST_NAME, d.NAME_SUFFIX, d.SAME_ADDRESS_EMPL,
+        d.ADDRESS1, d.ADDRESS2, d.CITY, d.STATE, d.POSTAL, d.COUNTRY, d.PHONE, d.BIRTHDATE, d.NATIONAL_ID, d.SEX,
+        d.MARITAL_STATUS, d.NQ_PROVED, d.IS_PS_DEP_BENEF, d.IS_DELETED, d.COMMENTS, d.LAST_UPDATED,
+        d.ORG_RELATION, d.DISABLED, d.STUDENT
+        FROM PS_T2_OE_ADD_DEPS d, PS_DEP_BEN pd
+        WHERE d.SCHED_ID = :sched_id
+        and d.EMPLID = :emplid
+        and d.BENEFIT_RCD_NBR = :benefit_rcd_nbr
+        and d.EVENT_ID = :event_id
+        and d.EMPLID = pd.EMPLID(+)
+        and d.DEPENDENT_BENEF = pd.DEPENDENT_BENEF(+)
+        and pd.DT_OF_DEATH is null
+        order by d.DEPENDENT_BENEF
+    </sql-query>
+
+    <sql-query name="SQL.benefit.enrollment.find.ee.hasDependent">
+        SELECT a.* From Ps_Bas_Partic X,Ps_Health_Benefit A
+        Where X.Sched_Id = :sched_id
+		And x.Emplid=:emplid
+		And x.benefit_rcd_nbr =:benefit_rcd_nbr
+		And x.event_id = :event_id
+		And X.Emplid = A.Emplid
+		And X.Benefit_Rcd_Nbr = A.Empl_Rcd
+		And A.Plan_Type In ('10','15')
+		AND A.coverage_elect = 'E' and A.EFFDT =
+		(SELECT MAX(A_ED.EFFDT) FROM PS_HEALTH_BENEFIT A_ED
+		WHERE A.EMPLID = A_ED.EMPLID
+		AND A.EMPL_RCD = A_ED.EMPL_RCD
+		AND A.COBRA_EVENT_ID = A_ED.COBRA_EVENT_ID
+		AND A.PLAN_TYPE = A_ED.PLAN_TYPE
+		And A.Benefit_Nbr = A_Ed.Benefit_Nbr
+		And A_Ed.Effdt &lt;= X.Event_Dt)
+		AND A.Covrg_Cd in ('82','8C','84')
+    </sql-query>
+
+    <sql-query name="SQL.OE.EmployeeReferrerCode.findByCompany">
+        select
+        case when a.T2_PEO_ID =' '
+        then a.t2_referrer
+        when a.t2_referrer =' '
+        then a.T2_PEO_ID
+        else a.t2_referrer
+        end as t2_referrer
+        from ps_t2_cloptn_effdt a
+        where a.company = :company
+        and a.effdt = (SELECT MAX(ed.EFFDT) from PS_T2_CLOPTN_EFFDT ed
+        where a.company = ed.company
+        and a.pf_client = ed.pf_client)
+    </sql-query>
+
+    <sql-query name="SQL.OE.DualCoverage.BasPartic.Cost.update">
+        update ps_bas_partic_cost
+        set event_dt = :event_dt
+        where sched_id = :sched_id  and emplid = :emplid and benefit_rcd_nbr = :benefit_rcd_nbr and event_id = :event_id
+    </sql-query>
+
+    <sql-query name="SQL.OE.DualCoverage.BasPartic.Optn.update">
+        update ps_bas_partic_optn
+        set event_dt = :event_dt
+        where sched_id = :sched_id  and emplid = :emplid and benefit_rcd_nbr = :benefit_rcd_nbr and event_id = :event_id
+    </sql-query>
+
+    <sql-query name="SQL.emplid.role.bdm">
+        select ps_emplid from CRM_HRP_ROLES_VW where ORGID = :companyId
+        and ROLE_ID = 'CDM'
+    </sql-query>
+
+    <sql-query name="SQL.lsc.requests.log.insert">
+        INSERT INTO PERS_LSC_REQUESTS_LOG (PERSONID, COMPANY, LSC_EVENT, LSC_DATE, ENTRY_DATE)
+        VALUES (:personId, :company, :eventId, to_date(:lscEventDate, 'yyyy-mm-dd'), to_date(:enteredDate, 'yyyy-mm-dd'))
+    </sql-query>
+
+    <sql-query name="SQL.lsc.recent.events">
+        select le.lsc_event_desc,plr.lsc_date, plr.entry_date,plr.lsc_event
+        from PERS_LSC_REQUESTS_LOG plr, lsc_events le, person_keys pk
+        where trim(le.lsc_event)=trim(plr.lsc_event)
+        and plr.personid=pk.personid
+        and pk.pers_key_type='2'
+        and pk.pers_key=:empid
+        and plr.lsc_date &gt;= sysdate - 120
+        order by lsc_date desc, lsc_event_desc
+    </sql-query>
+
+    <sql-query name="SQL.company.hrauth.role.status">
+        select AV.PERSONID from allroles_vw AV, person_emplymnt p
+        where AV.S_ROLE='HRAUTH'
+        and AV.personid=p.personid
+        and AV.ORGID= :companyId
+        and p.ENDDT &gt; sysdate
+        and p.emplymnt_status='A'
+        and rownum=1
+    </sql-query>
+
+    <sql-query name="SQL.client.leave.plans">
+        select 1 from PERS_LEAVEPLN_ELECTS
+		where personid=(select max(personid) from person_keys where pers_key=:emplId)
+    </sql-query>
+
+     <sql-query name="SQL.custom.change.rec">
+        select distinct(cid), company, ftype, flabel from CUSTOMCHANGE
+		where company=:company
+    </sql-query>
+
+	<sql-query name="SQL.custom.change.insert">
+       INSERT INTO CUSTOMCHANGE(cid,emplid,company,ftype,flabel,fanswer,eftdate)
+       VALUES(:cid,:emplid,:company,:ftype,:flabel,:fanswer,:sy_date)
+    </sql-query>
+
+	<sql-query name="SQL.custom.change.sequence">
+       select customchange_seq.nextval from dual
+    </sql-query>
+
+	<sql-query name="SQL.custom.change.update">
+       update customchange set ftype=:ftype, flabel=:flabel where cid=:cid
+    </sql-query>
+
+	<sql-query name="SQL.custom.change.delete">
+       delete from customchange where cid=:cid
+    </sql-query>
+
+    <sql-query name="SQL.custom.change.group.update">
+       update customchange set fanswer=:fanswer where cid=:cid  and ftype=:ftype and emplid=:emplid
+    </sql-query>
+
+    <sql-query name="SQL.custom.change.get.label">
+        select * from CUSTOMCHANGE
+		where company=:company and flabel=:label
+    </sql-query>
+
+    <sql-query name="SQL.employees.for.company">
+    	select distinct personid, company from person_emplymnt pe where pe.company=:company
+		and pe.emplymnt_status='A'
+		and pe.effdt = (select max(pe1.effdt) from person_emplymnt pe1 where pe.company=pe1.company and pe.personid=pe1.personid)
+    </sql-query>
+
+    <sql-query name="SQL.OE.check.if.accord.company">
+        select company from ps_t2_cloptn_effdt
+        where company =:companyId and (T2_REFERRER = 'ACD' OR T2_PEO_ID = 'ACD')
+    </sql-query>
+
+    <sql-query name="SQL.OE.check.if.ambrose.company">
+        select company from ps_t2_cloptn_effdt
+        where company =:companyId and (T2_REFERRER = 'AMB' OR T2_PEO_ID = 'AMB')
+    </sql-query>
+
+    <sql-query name="SQL.custom.change.rec.emp">
+        select * from CUSTOMCHANGE
+		where emplid=:emplid and company=:company order by cid desc
+    </sql-query>
+
+    <sql-query name="SQL.custom.change.rec.employ">
+        select * from customchange where company=:company and emplid=:emplid and ftype=:type and flabel=:label
+    </sql-query>
+
+    <sql-query name="SQL.custom.change.rec.employ.update">
+        update customchange set fanswer=:answer, flabel=:label where company=:company and emplid=:emplid and ftype=:type and flabel=:label
+    </sql-query>
+
+    <sql-query name="SQL.custom.change.answered">
+        select * from CUSTOMCHANGE where fanswer is not null and cid=:cid
+    </sql-query>
+
+    <sql-query name="SQL.csa.companies">
+        select co.company, ct.descr
+		from ps_t2_clientoption@hrdb_seeker co, ps_company_tbl@hrdb_seeker ct
+		where co.company = ct.company
+		and co.T2_PEO_ID='PAS'
+		and ct.effdt = (select max(ct1.effdt) from ps_company_tbl@hrdb_seeker ct1 where ct.company = ct1.company) 
+		and co.t2_comp_term_dt is null
+    </sql-query>
+
+</hibernate-mapping>

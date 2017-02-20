@@ -1,0 +1,70 @@
+<?xml version="1.0"?>
+<!DOCTYPE hibernate-mapping PUBLIC "-//Hibernate/Hibernate Mapping DTD 3.0//EN"  "http://hibernate.sourceforge.net/hibernate-mapping-3.0.dtd">
+<!-- Common named JPA queries for TriNet Open Enrollment. -->
+
+<hibernate-mapping>
+	<sql-query name="SQL.psName.findByIdEmplIdAndMaxEffectiveDate">
+		select * from ps_names ps where ps.emplid
+		=:emplid and effdt = (select
+		max(effdt) from ps_names where
+		emplid=ps.emplid) and name_type='PRI'
+	</sql-query>
+	
+	<sql-query name="SQL.psName.employeeName">
+		select FIRST_NAME ||' ' || (case when
+		Middle_Name!=' ' then Middle_Name || '
+		' else '' end ) || last_name
+		from ps_names a WHERE a.emplid = :emplid
+		and a.effdt = (select
+		max(effdt) from ps_names b WHERE b.emplid =
+		a.emplid)
+	</sql-query>
+	
+	<sql-query name="SQL.psName.findPersonSecurityByPersonId">
+		select * from person_security ps where
+		ps.personId = :personId and
+		session_active='Y'
+	</sql-query>
+	
+	<sql-query name="SQL.psName.findPersonSecurityByPersonIdTsessionId">
+		select * from person_security ps where
+		ps.personId = :personId and
+		encrypted_session = :tsessionId and
+		session_active='Y'
+	</sql-query>
+	
+	<sql-query name="SQL.psName.sepCheckMessageForCompany">
+		SELECT B.T2_PEO_ID,
+		B.T2_PE_TYPE,
+		C.XLATLONGNAME,
+		B.MESSAGE_PARM FROM PS_T2_PE_PEOID_TBL A,
+		PS_T2_PE_PEOMSG_TL B, PSXLATITEM C
+		WHERE A.EFF_STATUS = 'A'
+		AND A.EFFDT
+		=(SELECT MAX (A_ED.EFFDT) FROM PS_T2_PE_PEOID_TBL A_ED WHERE
+		A.T2_PEO_ID = A_ED.T2_PEO_ID AND A_ED.EFFDT &lt;= SYSDATE)
+		AND A.T2_PEO_ID
+		= B.T2_PEO_ID
+		AND B.EFFDT =(SELECT MAX (B_ED.EFFDT) FROM
+		PS_T2_PE_PEOMSG_TL B_ED WHERE
+		B.T2_PEO_ID = B_ED.T2_PEO_ID AND
+		B_ED.EFFDT &lt;= SYSDATE)
+		AND B.T2_PE_TYPE = :msgType
+		AND B.T2_PEO_ID =
+		(SELECT CASE X.T2_PEO_ID WHEN ' ' THEN 'PAS' ELSE
+		X.T2_PEO_ID END CASE
+		FROM PS_T2_CLIENTOPTION X WHERE X.COMPANY =
+		:company
+		AND
+		X.T2_COMP_TERM_DT IS NULL)
+		AND C.FIELDNAME = 'T2_PE_TYPE'
+		AND
+		C.FIELDVALUE = B.T2_PE_TYPE AND C.EFFDT =(SELECT MAX (C_ED.EFFDT)
+		FROM
+		PSXLATITEM C_ED WHERE C_ED.FIELDNAME = C.FIELDNAME
+		AND C_ED.FIELDVALUE
+		= C.FIELDVALUE
+		AND C_ED.EFFDT &lt;= SYSDATE)
+	</sql-query>
+
+</hibernate-mapping>

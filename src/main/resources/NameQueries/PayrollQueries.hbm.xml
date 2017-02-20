@@ -1,0 +1,2696 @@
+<?xml version="1.0"?>
+<!DOCTYPE hibernate-mapping PUBLIC "-//Hibernate/Hibernate Mapping DTD 3.0//EN"  "http://hibernate.sourceforge.net/hibernate-mapping-3.0.dtd">
+<!-- 
+    Common named queries for TriNet Payroll.
+-->
+
+<hibernate-mapping>
+	<sql-query name="SQL.Employee.isCompanyContact">
+		select * from allroles_vw where personid=:personId
+	</sql-query>
+    <sql-query name="SQL.Payroll.View.getEmployeeEarnings">
+        select
+           A.EMPLID,
+           A.NAME,
+           A.SEPCHK,
+           A.DEPTID,
+           A.PAGE_NUM,
+           A.LINE_NUM,
+           A.ADDL_NBR,
+           A.SEQ_NUM,
+           A.PLAN_TYPE,
+           A.LOCATION,
+           A.TYPE,
+           A.ERNCD,
+           A.DESCR,
+           A.DESCR50,
+           A.AMOUNT,
+           B.DEPTID as HOME_DEPT,
+           B.EMPL_STATUS,
+           B.EMPL_TYPE,
+           B.FULL_PART_TIME,
+           C.DESCR as DEPT_DESCR,
+           A.HOURS_EARNED,
+           A.COMPRATE_USED_REG
+        FROM PS_T2_PE_ALLPAY_VW A,
+            ps_job B,
+            PS_DEPT_TBL C
+        where
+            A.company = :company
+            and A.paygroup = :payGroup
+            AND A.PAY_END_DT = :payEndDate
+            and A.off_cycle = :offCycle
+            and A.t2_payroll_num = :payrollNumber
+            and B.company = A.company
+            and B.PAYGROUP = A.paygroup
+            and B.EMPLID = A.EMPLID
+            and B.EMPL_RCD = A.EMPL_RCD
+            AND B.EFFDT =
+                     (SELECT MAX (B_ED.EFFDT)
+                        FROM PS_JOB B_ED
+                       WHERE     B.EMPLID = B_ED.EMPLID
+                             AND B.EMPL_RCD = B_ED.EMPL_RCD
+                             and B.company = B_ED.company
+                             and B.PAYGROUP = B_ED.paygroup
+                             AND B_ED.EFFDT &lt;= :payEndDate)
+              AND B.EFFSEQ =
+                     (SELECT MAX (B_ES.EFFSEQ)
+                        FROM PS_JOB B_ES
+                       WHERE     B.EMPLID = B_ES.EMPLID
+                             AND B.EMPL_RCD = B_ES.EMPL_RCD
+                             and B.company = B_ES.company
+                             and B.PAYGROUP = B_ES.paygroup
+                             AND B.EFFDT = B_ES.EFFDT)
+              AND C.DEPTID = A.DEPTID
+              AND C.EFFDT =
+                     (SELECT MAX (C_ED.EFFDT)
+                        FROM PS_DEPT_TBL C_ED
+                       WHERE     C.SETID = C_ED.SETID
+                             AND C.DEPTID = C_ED.DEPTID
+                             AND C_ED.EFFDT &lt;= :payEndDate
+                             AND C_ED.EFF_STATUS = 'A')
+              and ((A.TYPE in (1,2,3) AND A.AMOUNT &lt;&gt; 0) OR A.TYPE not in (1,2,3))
+              ORDER BY A.SEPCHK, A.DEPTID
+
+    </sql-query>
+    <sql-query name="SQL.Payroll.View.getEmployeeHours">
+
+        select
+           EMPLID,
+           SEPCHK,
+           DEPTID,
+           PAGE_NUM,
+           LINE_NUM,
+           ADDL_NBR,
+           TYPE,
+           ERNCD,
+           DESCRSHORT,
+           DESCR,
+           HOURS1,
+           COMPRATE_USED_REG
+        from PS_T2_PE_EE_HRS_VW where
+            company = :company
+            and paygroup = :payGroup
+            AND PAY_END_DT = :payEndDate
+            and off_cycle = :offCycle
+            and t2_payroll_num = :payrollNumber
+
+    </sql-query>
+    <sql-query name="SQL.Payroll.View.getHeaderInfo">
+        select distinct
+                A.PF_CALC_DTTM as RUN_TIME,
+                B.paygroup as paygroup,
+                B.descr1 as paygroup_descr,
+                B.pay_end_dt,
+                C.COMPANY as employer_comp,
+                C.DESCR as employer_comp_desc,
+                C.ADDRESS1 as employer_address1,
+                C.ADDRESS2 as employer_address2,
+                C.CITY as employer_city,
+                C.STATE as employer_state,
+                C.POSTAL as employer_postal,
+                D.COMPANY as provider_comp,
+                D.DESCR as provider_comp_desc,
+                D.ADDRESS1 as provider_address1,
+                D.ADDRESS2 as provider_address2,
+                D.CITY  as provider_city,
+                D.STATE as provider_state,
+                D.POSTAL as provider_postal
+        from PS_T2_PAYROLL_HDR a,
+        PS_T2_PE_COMP_HDR b,
+        ps_company_tbl c,
+        ps_company_tbl d,
+        PS_T2_CLIENTOPTION E,
+        PS_T2_PE_PEO_CNTRY F
+         where
+            a.company = :company
+            and a.paygroup = :payGroup
+            AND A.PAY_END_DT = :payEndDate
+            and a.off_cycle = :offCycle
+            and a.t2_payroll_num = :payrollNumber
+            and B.company = a.company
+            and B.paygroup = a.paygroup
+            and B.pay_end_dt = a.pay_end_dt
+            and B.off_cycle = a.off_cycle
+            and C.company = a.company
+            and c.EFFDT = (select max(c1.EFFDT)
+                                from ps_company_tbl c1
+                                WHERE c1.company = c.company)
+            and c.EFF_STATUS='A'
+            AND E.company = B.company
+            AND F.PF_CORP = E.PF_CORP
+            and d.company = CASE WHEN F.COUNTRY = 'USA' THEN '001' ELSE '002' END
+            and d.EFFDT = (select max(d1.EFFDT)
+                                  from ps_company_tbl d1
+                                  WHERE d1.company = d.company)
+            and d.EFF_STATUS='A'
+    </sql-query>
+    <sql-query name="SQL.Payroll.View.getInvoiceTotal">
+        select sum(AMOUNT)
+        from PS_T2_PE_PROFRM_VW where
+            company = :company
+            and paygroup = :payGroup
+            AND PAY_END_DT = :payEndDate
+            and off_cycle = :offCycle
+            and t2_payroll_num = :payrollNumber
+            GROUP BY company, paygroup, off_cycle
+    </sql-query>
+    
+	<sql-query name="SQL.Payroll.OffCycle.getOncyclePayrolls">
+   		SELECT DISTINCT PR.COMPANY, PR.T2_HRP_PAYROLL_NUM, PR.LOCATION,
+			PR.DEPTID, PR.PAYGROUP, PR.DESCR, PR.OFF_CYCLE, 
+			PR.PAY_BEGIN_DT, PR.PAY_END_DT, PR.CHECK_DT,  
+			PR.PAY_FREQUENCY, PR.T2_PE_PAYROLL_NAME, 
+            PR.T2_PE_STATUS, PR.T2_PP_REPORT_DT, PR.T2_OC_REASON_CD,  
+            PR.T2_PE_ENTRY_OPTN, PR.OPRID, NVL(PN.NAME,  'Admin') as OPR_NAME,  
+            PR.TIME_STAMP, nvl(jc.t2_pe_cp_flag,'N')
+        FROM PS_T2_PE_PROCESS pr 
+        	left outer join PS_T2_PE_PAYGRP_VW jc
+				on pr.company = jc.company
+				and pr.paygroup = jc.paygroup
+				and pr.pay_end_dt = jc.pay_end_dt
+			LEFT JOIN PS_PERSON_NAME pn 
+				ON PR.OPRID = PN.EMPLID
+			INNER JOIN PS_PAYGROUP_TBL PG 
+				ON PG.COMPANY = PR.COMPANY
+				AND PG.PAYGROUP = PR.PAYGROUP
+            WHERE PR.COMPANY = :company
+            AND PG.EFFDT = (SELECT MAX(PG_ED.EFFDT) FROM PS_PAYGROUP_TBL PG_ED
+                        WHERE PG_ED.COMPANY = PG.COMPANY 
+                        AND PG.PAYGROUP = PG_ED.PAYGROUP
+                        AND PG_ED.EFFDT &lt;= SYSDATE)
+            AND PG.EFF_STATUS = 'A'
+            AND PR.OFF_CYCLE = 'N'
+            AND PR.PAY_END_DT = (select max(PR1.PAY_END_DT) FROM ps_t2_pe_process PR1
+                                where PR1.company = PR.company
+                                and PR1.PAYGROUP = PR.PAYGROUP
+                                and PR1.T2_HRP_PAYROLL_NUM = PR.T2_HRP_PAYROLL_NUM 
+                                and PR1.off_cycle = PR.off_cycle)
+        ORDER BY PR.DESCR
+     </sql-query>
+
+    <sql-query name="SQL.Payroll.DataEntry.getEmployeesPaymentMethod"> 
+     
+        SELECT DISTINCT EMPLID, payment_method  FROM (
+            SELECT distinct
+              J.EMPLID,
+              CASE
+                WHEN (A.EMPLID IS NULL OR A.EFF_STATUS = 'I') THEN 'C'
+                WHEN (A.EFF_STATUS = 'A' AND B.ACCOUNT_TYPE &lt;&gt; '$'
+                          AND EXISTS  (SELECT 'X' FROM PS_DIR_DEP_DISTRIB B1
+                                       WHERE B.EMPLID = B1.EMPLID
+                                       AND B.EFFDT = B1.EFFDT
+                                        AND B1.ACCOUNT_TYPE = '$')) THEN 'CA'
+                WHEN (A.EFF_STATUS = 'A' AND B.ACCOUNT_TYPE &lt;&gt; '$') THEN 'A'
+              END as payment_method
+            FROM PS_T2_PE_PYRL_EMP J
+              left outer join PS_DIRECT_DEPOSIT A
+                  on J.EMPLID = A.EMPLID
+              left outer join PS_DIR_DEP_DISTRIB B
+                  on A.EMPLID = B.EMPLID
+              WHERE J.COMPANY = :company
+                AND J.PAYGROUP = :payGroup
+                AND J.PAY_END_DT = :payEndDate
+                AND J.OFF_CYCLE = :offCycle
+                AND J.T2_HRP_PAYROLL_NUM = :payrollNumber
+                AND (A.EFFDT IS NULL OR A.EFFDT = (SELECT MAX(A_ED.EFFDT) FROM PS_DIRECT_DEPOSIT A_ED
+                                WHERE A.EMPLID = A_ED.EMPLID
+                                  AND A_ED.EFFDT &lt;= SYSDATE))
+                AND (B.EFFDT IS NULL OR B.EFFDT = (SELECT MAX(B_ED.EFFDT) FROM PS_DIR_DEP_DISTRIB B_ED
+                                WHERE B.EMPLID = B_ED.EMPLID
+                                  AND B_ED.EFFDT &lt;= A.EFFDT)))
+        where payment_method &lt;&gt; ' '
+    </sql-query>
+    <sql-query name="SQL.Payroll.DataEntry.getEmployeesPaymentMethodForEmployee">
+        SELECT DISTINCT EMPLID, payment_method  FROM (
+            SELECT distinct
+              J.EMPLID,
+              CASE
+                WHEN (A.EMPLID IS NULL OR A.EFF_STATUS = 'I') THEN 'C'
+                WHEN (A.EFF_STATUS = 'A' AND B.ACCOUNT_TYPE &lt;&gt; '$'
+                          AND EXISTS  (SELECT 'X' FROM PS_DIR_DEP_DISTRIB B1
+                                       WHERE B.EMPLID = B1.EMPLID
+                                       AND B.EFFDT = B1.EFFDT
+                                        AND B1.ACCOUNT_TYPE = '$')) THEN 'CA'
+                WHEN (A.EFF_STATUS = 'A' AND B.ACCOUNT_TYPE &lt;&gt; '$') THEN 'A'
+              END as payment_method
+            FROM PS_T2_PE_PYRL_EMP J
+              left outer join PS_DIRECT_DEPOSIT A
+                  on J.EMPLID = A.EMPLID
+              left outer join PS_DIR_DEP_DISTRIB B
+                  on A.EMPLID = B.EMPLID
+              WHERE J.COMPANY = :company
+                AND J.EMPLID = :emplid
+                AND J.PAYGROUP = :payGroup
+                AND J.PAY_END_DT = :payEndDate
+                AND J.OFF_CYCLE = :offCycle
+                AND J.T2_HRP_PAYROLL_NUM = :payrollNumber
+                AND (A.EFFDT IS NULL OR A.EFFDT = (SELECT MAX(A_ED.EFFDT) FROM PS_DIRECT_DEPOSIT A_ED
+                                WHERE A.EMPLID = A_ED.EMPLID
+                                  AND A_ED.EFFDT &lt;= SYSDATE))
+                AND (B.EFFDT IS NULL OR B.EFFDT = (SELECT MAX(B_ED.EFFDT) FROM PS_DIR_DEP_DISTRIB B_ED
+                                WHERE B.EMPLID = B_ED.EMPLID
+                                  AND B_ED.EFFDT &lt;= A.EFFDT)))
+        where payment_method &lt;&gt; ' '
+    </sql-query>
+    <sql-query name="SQL.Payroll.DataEntry.getEmployeesByPayGroup">
+        SELECT COMPANY, PAYGROUP, EMPLID, EMPL_RCD,
+            DEPTID, DESCR, JOBCODE, LOCATION, DESCR1,
+            LAST_NAME, FIRST_NAME, MIDDLE_NAME,
+            EMPL_STATUS, T2_EMPL_STS_DESCR, STATUS,
+            REG_TEMP, FULL_PART_TIME, EMPL_TYPE,
+            EMPL_CLASS, HIRE_DT, TERMINATION_DT,
+            LAST_DATE_WORKED, US_WORK_ELIGIBILTY
+        FROM PS_T2_PE_EMPOFF_VW WHERE
+        COMPANY = :company
+        and PAYGROUP = :payGroup
+    </sql-query>
+    <sql-query name="SQL.timesheetPayroll.findCompanyByRole">
+    	<![CDATA[
+    		SELECT DISTINCT v.orgid,
+			  o.org_desc,
+			  NVL (css.Component_value, 'N') leave_request,
+			  D.COUNTRY,
+			  CASE
+			    WHEN SYSDATE <=
+			      (SELECT ADD_MONTHS (MIN (PAY_END_DT), 14)
+			      FROM PS_T2_PAYROLL_HDR
+			      WHERE company = srt.company
+			      )
+			    THEN 'N'
+			    ELSE 'Y'
+			  END AS HASHISTORICDATA,
+			  CASE
+			    WHEN srt.SORT_ID > '1'
+			    THEN 'Y'
+			    ELSE 'N'
+			  END AS sort_order,
+			  C.T2_PEO_ID,
+			  VERT.T2_VERTICAL_CD
+			FROM allroles_vw@hpdb_hrdb v
+			INNER JOIN orgs@hpdb_hrdb o
+				ON v.orgid = o.orgid
+			LEFT OUTER JOIN component_setup_steps@hpdb_hrdb css
+				ON v.orgid = css.orgid
+				AND SYSDATE BETWEEN css.effdt AND css.ENDDT
+				AND o.orgid            = css.orgid
+				AND css.component_name = 'LEAVE_REQUEST'
+			INNER JOIN PS_T2_CLIENTOPTION C
+				ON C.COMPANY             = v.orgid
+				AND C.T2_TIME_ATTENDANCE = 'PSTA'
+			LEFT OUTER JOIN PS_T2_CLOPTN_VERT VERT
+				ON VERT.COMPANY = v.orgid
+			LEFT OUTER JOIN PS_T2_PE_PEO_CNTRY D
+				ON C.PF_CORP = D.PF_CORP
+			LEFT OUTER JOIN PS_T2_PE_CMP_SORT srt
+				ON v.orgid       = srt.COMPANY
+			WHERE v.personid = :personId
+			AND v.s_role    IN ('EPTAG', 'EPHRS', 'EPHNA','EPNPI','EPHPR')
+			AND o.uniqueid   =
+				  (SELECT MAX (o1.uniqueid)
+				  FROM orgs@hpdb_hrdb o1
+				  WHERE o.orgid    = o1.orgid
+				  AND o.parent_org = o1.parent_org
+				  AND SYSDATE BETWEEN o1.effdt AND o1.enddt
+				  )
+			AND ( css.uniqueid IS NULL
+					OR css.uniqueid     =
+					  (SELECT MAX (css1.uniqueid)
+					  FROM component_setup_steps@hpdb_hrdb css1
+					  WHERE css.orgid        = css1.orgid
+					  AND css.component_name = css1.component_name
+					  AND SYSDATE BETWEEN css1.effdt AND css1.ENDDT
+					  ))
+			AND srt.effdt =
+				  (SELECT MAX (s1.EFFDT)
+				  FROM PS_T2_PE_CMP_SORT s1
+				  WHERE s1.company = srt.company
+				  AND s1.effdt    <= COALESCE (
+				    (SELECT MAX (PAY_BEGIN_DT)
+				    FROM PS_T2_PE_PROCESS PRC
+				    WHERE PRC.company = srt.company
+				    ), c.t2_comp_live_dt)
+				  )
+			AND srt.sort_id =
+				  (SELECT MAX (s2.SORT_ID)
+				  FROM PS_T2_PE_CMP_SORT s2
+				  WHERE s2.company = srt.company
+				  AND srt.effdt    = s2.effdt
+				  )
+			AND ( VERT.EFFDT IS NULL OR VERT.EFFDT =
+					  (SELECT MAX(VERT_ED.EFFDT)
+					  FROM PS_T2_CLOPTN_VERT VERT_ED
+					  WHERE VERT.COMPANY = VERT_ED.COMPANY
+					  AND VERT_ED.EFFDT <= SYSDATE
+					  ))
+    	]]>
+    </sql-query>
+    <sql-query name="SQL.timesheetPayroll.findStatesByCompanies">
+        select * from PS_COUNTRY_TBL where country in :countryList
+    </sql-query>
+    <sql-query name="SQL.timesheetPayroll.findPreviewData">
+        select
+           EMPLID,
+           TYPE,
+           DESCR,
+           AMOUNT,
+           TOTAL_GROSS ,
+           TOTAL_TAXES ,
+           TOTAL_DEDUCTIONS,
+           NET_PAY
+        from PS_T2_PE_ALLPAY_VW where
+            company = :company
+            and paygroup = :payGroup
+            AND PAY_END_DT = :payEndDate
+            and off_cycle = :offCycle
+            and t2_payroll_num = :payrollNumber
+    </sql-query>
+
+    <sql-query name="SQL.timesheetPayroll.status">
+        select t2_pe_status
+        from ps_t2_pe_process where
+            company = :company
+            and paygroup = :payGroup
+            AND PAY_END_DT = :payEndDate
+            and off_cycle = :offCycle
+            and t2_payroll_num = :payrollNumber
+    </sql-query>
+
+    <sql-query name="SQL.timesheetPayroll.findYtdContributions">
+        select
+           descr, sum(AMOUNT)
+        from PS_T2_PE_ALLPAY_VW where
+            company = :company
+            and paygroup = :payGroup
+            and pay_end_dt &lt; :payEndDate
+            and EXTRACT( YEAR FROM pay_end_dt) = EXTRACT( YEAR FROM :payEndDate)
+            and off_cycle = :offCycle
+            and t2_payroll_num = :payrollNumber
+            and emplId = :emplId
+            and type in (6)
+            group by descr
+    </sql-query>
+
+    <sql-query name="SQL.timesheetPayroll.findPreviewDataByEmpl">
+        select
+           EMPLID,
+           TYPE,
+           DESCR,
+           AMOUNT,
+           TOTAL_GROSS ,
+           TOTAL_TAXES ,
+           TOTAL_DEDUCTIONS,
+           NET_PAY
+        from PS_T2_PE_ALLPAY_VW where
+            company = :company
+            and paygroup = :payGroup
+            AND PAY_END_DT = :payEndDate
+            and off_cycle = :offCycle
+            and t2_payroll_num = :payrollNumber
+            and emplId = :emplId
+    </sql-query>
+
+    <sql-query name="SQL.timesheetPayroll.findDirectDepositInfoByEmpl">
+        select
+           ACCOUNT_TYPE,
+           ACCOUNT_NUM,
+           DEPOSIT_AMOUNT,
+           PAYCHECK_NBR
+        from PS_T2_PE_PAY_DISTR where
+            company = :company
+            and paygroup = :payGroup
+            AND PAY_END_DT = :payEndDate
+            and off_cycle = :offCycle
+            and t2_payroll_num = :payrollNumber
+            and emplId = :emplId
+    </sql-query>
+
+    <sql-query name="SQL.timesheetPayroll.findPreviewDataWithEmpl">
+        select
+           EMPLID,
+           NAME,
+           TYPE,
+           DESCR50,
+           AMOUNT,
+           DEPTID,
+           TOTAL_GROSS ,
+           TOTAL_TAXES ,
+           TOTAL_DEDUCTIONS,
+           NET_PAY,
+           LOCATION,
+           ERNCD,
+           DESCR
+        from PS_T2_PE_ALLPAY_VW where
+            company = :company
+            and paygroup = :payGroup
+            AND PAY_END_DT = :payEndDate
+            and off_cycle = :offCycle
+            and t2_payroll_num = :payrollNumber
+        order by NAME
+    </sql-query>
+
+    <sql-query name="SQL.timesheetPayroll.findAllWithEmployeeHours">
+        select
+           EMPLID,
+           DESCR,
+           HOURS1,
+           TYPE,
+           COMPRATE_USED_REG,
+           ERNCD,
+           DESCRSHORT
+        from PS_T2_PE_EE_HRS_VW where
+            company = :company
+            and paygroup = :payGroup
+            AND PAY_END_DT = :payEndDate
+            and off_cycle = :offCycle
+            and t2_payroll_num = :payrollNumber
+    </sql-query>
+
+    <sql-query name="SQL.timesheetPayroll.findHours">
+        select
+           DESCR,
+           HOURS1,
+           TYPE,
+           COMPRATE_USED_REG
+        from PS_T2_PE_EE_HRS_VW where
+            company = :company
+            and paygroup = :payGroup
+            AND PAY_END_DT = :payEndDate
+            and off_cycle = :offCycle
+            and emplId = :emplId
+    </sql-query>
+
+    <sql-query name="SQL.timesheetPayroll.findHoursForEmployees">
+        select
+           EMPLID,
+           DESCR,
+           HOURS1,
+           TYPE,
+           COMPRATE_USED_REG
+        from PS_T2_PE_EE_HRS_VW where
+            company = :company
+            and paygroup = :payGroup
+            AND PAY_END_DT = :payEndDate
+            and off_cycle = :offCycle
+            and t2_payroll_num = :payrollNumber
+    </sql-query>
+
+    <sql-query name="SQL.timesheetPayroll.findAdvDataForEmpl">
+        select
+            NET_PAY,
+            TOTAL_DEDUCTIONS,
+            TOTAL_TAXES,
+            TOTAL_GROSS,
+            TXGRS_CUR
+        from PS_T2_PE_EMPADV_VW where
+            company = :company
+            and paygroup = :payGroup
+            AND PAY_END_DT = :payEndDate
+            and off_cycle = :offCycle
+            and emplId = :emplId
+    </sql-query>
+
+    <sql-query name="SQL.timesheetPayroll.findAdvDataForEmplYTD">
+        select
+            NET_PAY_YTD,
+            TOTAL_DEDNS_YTD,
+            TOTAL_TAXES_YTD,
+            TOTAL_GROSS_YTD,
+            TXGRS_YTD
+        FROM PS_T2_PE_YTDTOT_VW where
+            company = :company
+            and emplId = :emplId
+            and balance_id = 'CY'
+            and pay_end_dt = (select least(max(pay_end_dt), :payEndDate) from PS_T2_PE_YTDTOT_VW where
+                                company = :company and emplId = :emplId  and balance_id = 'CY')
+    </sql-query>
+
+    <sql-query name="SQL.timesheetPayroll.summaryHeader">
+        select
+           DESCR,
+           DESCR1,
+           CHECK_DT
+        from PS_T2_PE_COMP_HDR where
+            company = :company
+            and paygroup = :payGroup
+            AND PAY_END_DT = :payEndDate
+            and off_cycle = :offCycle
+    </sql-query>
+
+    <sql-query name="SQL.timesheetPayroll.summaryHeaderWithEmpl">
+        select
+           NAME,
+           PAYGROUP,
+           CHECK_DT,
+           DESCR
+        from PS_T2_PE_COMP_HDR where
+            company = :company
+            and paygroup = :payGroup
+            AND PAY_END_DT = :payEndDate
+            and off_cycle = :offCycle
+            and emplid = :emplId
+            and rownum &lt;=1
+    </sql-query>
+
+    <sql-query name="SQL.timesheetPayroll.findPreviewDataByDescrForType">
+        select
+           EMPLID,
+           NAME,
+           DEPTID,
+           AMOUNT,
+           DESCR
+        from PS_T2_PE_ALLPAY_VW where
+            company = :company
+            and paygroup = :payGroup
+            AND PAY_END_DT = :payEndDate
+            and off_cycle = :offCycle
+            and t2_payroll_num = :payrollNumber
+            and type in :type
+            and descr = :description
+    </sql-query>
+
+    <sql-query name="SQL.timesheetPayroll.findEmplAddressAndTax">
+        select
+            address1,
+            address2,
+            city,
+            state,
+            state2,
+            resident,
+            postal,
+            fwt_mar_status,
+            fwt_allowances,
+            fwt_addl_amt,
+            fwt_addl_pct,
+            swt_mar_status,
+            swt_allowances,
+            swt_addl_allownces,
+            swt_addl_amt,
+            swt_addl_pct
+        from PS_T2_PE_EMPL_VW where
+            company = :company
+            and paygroup = :payGroup
+            AND PAY_END_DT = :payEndDate
+            and off_cycle = :offCycle
+            and emplid = :emplId
+    </sql-query>
+
+    <sql-query name="SQL.timesheetPayroll.findEmplDemoAndCompany">
+        select
+            deptid,
+            descr1,
+            business_title,
+            comprate,
+            name
+        from PS_T2_PE_EMP_DL_VW where
+            company = :company
+            and paygroup = :payGroup
+            AND PAY_END_DT = :payEndDate
+            and off_cycle = :offCycle
+            and emplid = :emplId
+    </sql-query>
+
+    <sql-query name="SQL.timesheetPayroll.findCheckAdviceInfo">
+        select
+            PAYCHECK_NBR,
+            CHECK_DT,
+            EARNS_BEGIN_DT,
+            EARNS_END_DT
+        from PS_T2_PE_EMPADV_VW where
+            company = :company
+            and paygroup = :payGroup
+            AND PAY_END_DT = :payEndDate
+            and off_cycle = :offCycle
+            and emplid = :emplId
+    </sql-query>
+
+    <sql-query name="SQL.timesheetPayroll.findLeaveYTDByEmpl">
+        select
+        HRS_CARRYOVER as "Start Balance YTD",
+        HRS_EARNED_YTD as "+Earned YTD",
+        HRS_TAKEN_YTD + HRS_TAKEN_UNPROC as "-Taken YTD",
+        HRS_ADJUST_YTD + HRS_ADJUST_UNPROC as "+Adjustments YTD",
+        HRS_CARRYOVER + HRS_EARNED_YTD - HRS_BOUGHT_YTD + HRS_BOUGHT_UNPROC -
+            (HRS_TAKEN_YTD + HRS_TAKEN_UNPROC) - (HRS_SOLD_YTD + HRS_SOLD_UNPROC) +
+            HRS_ADJUST_YTD + HRS_ADJUST_UNPROC as "End Balance YTD",
+        PLAN_TYPE
+        from PS_LEAVE_ACCRUAL
+        where
+            company = :company
+            and emplid = :emplId
+            and accrual_proc_dt = (select max(accrual_proc_dt) from PS_LEAVE_ACCRUAL where
+            company = :company and emplid = :emplId)
+    </sql-query>
+
+    <sql-query name="SQL.timesheetPayroll.findProForma">
+        select
+            DESCR,
+            SUM(AMOUNT)
+        from PS_T2_PE_PROFRM_VW where
+            company = :company
+            and paygroup = :payGroup
+            AND PAY_END_DT = :payEndDate
+            and off_cycle = :offCycle
+            and t2_payroll_num = :payrollNumber
+        GROUP BY DESCR ORDER BY DESCR
+    </sql-query>
+
+    <sql-query name="SQL.timesheetPayroll.findInvoiceTotal">
+        select sum(AMOUNT)
+        from PS_T2_PE_PROFRM_VW where
+            company = :company
+            and paygroup = :payGroup
+            AND PAY_END_DT = :payEndDate
+            and off_cycle = :offCycle
+            and t2_payroll_num = :payrollNumber
+            GROUP BY company, paygroup, off_cycle
+    </sql-query>
+
+    <sql-query name="SQL.timesheetPayroll.findRunDateTime">
+        select
+            PF_CALC_DTTM
+        from PS_T2_PAYROLL_HDR where
+            company = :company
+            and paygroup = :payGroup
+            AND PAY_END_DT = :payEndDate
+            and off_cycle = :offCycle
+            and t2_payroll_num = :payrollNumber
+    </sql-query>
+
+    <sql-query name="SQL.timesheetPayroll.findPayrollHeaderInfo">
+        select distinct
+                A.PF_CALC_DTTM as RUN_TIME,
+                B.paygroup as paygroup,
+                B.descr1 as paygroup_descr,
+                B.pay_end_dt,
+                C.COMPANY as employer_comp,
+                C.DESCR as employer_comp_desc,
+                C.ADDRESS1 as employer_address1,
+                C.ADDRESS2 as employer_address2,
+                C.CITY as employer_city,
+                C.STATE as employer_state,
+                C.POSTAL as employer_postal,
+                D.COMPANY as provider_comp,
+                D.DESCR as provider_comp_desc,
+                D.ADDRESS1 as provider_address1,
+                D.ADDRESS2 as provider_address2,
+                D.CITY  as provider_city,
+                D.STATE as provider_state,
+                D.POSTAL as provider_postal
+        from PS_T2_PAYROLL_HDR a,
+        PS_T2_PE_COMP_HDR b,
+        ps_company_tbl c,
+        ps_company_tbl d
+         where
+            a.company = :company
+            and a.paygroup = :payGroup
+            AND a.PAY_END_DT = :payEndDate
+            and a.off_cycle = :offCycle
+            and a.t2_payroll_num = :payrollNumber
+            and B.company = a.company
+            and B.paygroup = a.paygroup
+            and B.pay_end_dt = a.pay_end_dt
+            and B.off_cycle = a.off_cycle
+            and C.company = a.company
+            and c.EFFDT = (select max(c1.EFFDT)
+                                from ps_company_tbl c1
+                                WHERE c1.company = c.company)
+            and c.EFF_STATUS='A'
+            and d.company = '001'
+            and d.EFFDT = (select max(d1.EFFDT)
+                                  from ps_company_tbl d1
+                                  WHERE d1.company = d.company)
+            and d.EFF_STATUS='A'
+    </sql-query>
+
+    <sql-query name="SQL.timesheetPayroll.findPreviewYTD">
+        select
+            DESCR,
+            GRS_YTD,
+            HRS_YTD,
+            TYPE
+        from PS_T2_PE_YTD_VW YT where
+            YT.company = :company
+            and YT.balance_year = :balanceYear
+            and YT.emplid = :emplId
+            and YT.pay_end_dt =
+                (
+                select
+                    max(yt1.pay_end_dt)
+                from PS_T2_PE_YTD_VW YT1 where
+                    yt1.company=yt.company
+                    and yt1.balance_year=yt.balance_year
+                    and yt1.emplid=yt.emplid
+                    and yt1.descr=yt.descr
+                    and yt1.balance_id=yt.balance_id
+                    and yt1.pay_end_dt &lt;= :payEndDate
+                )
+            and YT.balance_id = 'CY'
+    </sql-query>
+
+    <sql-query name="SQL.timesheetPayroll.findPaymentOptions">
+        select
+            po.emplid,
+            xlat.xlatlongname
+        from ps_pay_check po
+            left join psxlatitem xlat on XLAT.FIELDVALUE = PO.PAYCHECK_OPTION
+            and XLAT.FIELDNAME = 'PAYCHECK_OPTION'
+        where
+            company = :company
+            and paygroup = :payGroup
+            AND PAY_END_DT = :payEndDate
+            and off_cycle = :offCycle
+    </sql-query>
+
+    <sql-query name="SQL.timesheetPayroll.deletePayrollGroupByPayrollNumber">
+        UPDATE PS_T2_PE_PROCESS PR
+            SET PR.EFF_STATUS = 'I'
+            WHERE PR.COMPANY = :company
+            AND PR.T2_HRP_PAYROLL_NUM = :payroll_number
+            AND PR.PAYGROUP = :paygroup
+    </sql-query>
+
+    <sql-query name="SQL.timesheetPayroll.deletePayrollGroupAddressByPayrollNumber">
+        UPDATE PS_T2_PE_SPCL_ADDR PRA
+            SET PRA.EFF_STATUS = 'I'
+            WHERE PRA.COMPANY = :company
+            AND PRA.T2_HRP_PAYROLL_NUM = :payroll_number
+            AND PRA.PAYGROUP = :paygroup
+    </sql-query>
+
+
+
+     <sql-query name="SQL.timesheetPayroll.getMasterEarningCodesByCompany">
+     SELECT DISTINCT A.ERNCD,
+                A.DESCR,
+                A.T2_PE_FLAG,
+                A.COMPANY,
+                A.IS_DELETED,
+                A.PAYMENT_TYPE,
+                A.FACTOR_MULT,
+                A.T2_PEO_ID,
+                A.T2_PE_401_ERCD_FLG,
+                A.T2_PE_SUP_ERNCD,
+                A.T2_PE_GRID_DISPLAY
+  FROM PS_T2_PE_ERNCMP_VW A
+ WHERE     A.COMPANY IN (:i_Companyid, ' ')
+       AND A.ERNCD IN
+              (SELECT DISTINCT ERNCD
+                 FROM PS_T2_PE_CO_ERN_VW A1
+                WHERE     A1.COMPANY = :i_Companyid
+                      AND A1.ERNCD NOT IN
+                             (SELECT B.ERNCD
+                                FROM PS_T2_PE_CMP_ERNCD B
+                               WHERE     B.COMPANY = :i_Companyid
+                                     AND B.EFFDT =
+                                            (SELECT MAX (B_ED.EFFDT)
+                                               FROM PS_T2_PE_CMP_ERNCD B_ED
+                                              WHERE     B.COMPANY =
+                                                           B_ED.COMPANY
+                                                    AND B.ERNCD = B_ED.ERNCD
+                                                    AND B_ED.EFFDT &lt;= SYSDATE)
+                                     AND B.EFFSEQ =
+                                            (SELECT MAX (B_ES.EFFSEQ)
+                                               FROM PS_T2_PE_CMP_ERNCD B_ES
+                                              WHERE     B.COMPANY =
+                                                           B_ES.COMPANY
+                                                    AND B.ERNCD = B_ES.ERNCD
+                                                    AND B.EFFDT = B_ES.EFFDT)
+                                     AND B.EFF_STATUS = 'A'))
+       AND (   A.T2_PEO_ID = ('DEF')
+            OR A.T2_PEO_ID = (SELECT CL.T2_PEO_ID
+                                FROM PS_T2_CLIENTOPTION CL
+                               WHERE CL.COMPANY = :i_Companyid))
+       AND NOT EXISTS
+              (SELECT DAT.ERNCD, DAT.T2_PEO_ID
+                 FROM (SELECT E.ERNCD, 'DEF' AS T2_PEO_ID
+                         FROM PS_T2_PE_ERNCMP_VW E
+                        WHERE E.T2_PEO_ID = (SELECT CL.T2_PEO_ID
+                                               FROM PS_T2_CLIENTOPTION CL
+                                              WHERE CL.COMPANY = :i_Companyid)) DAT
+                WHERE DAT.ERNCD = A.ERNCD AND DAT.T2_PEO_ID = A.T2_PEO_ID)
+     </sql-query>
+
+
+    <sql-query name="SQL.timesheetPayroll.getAllEarningCodesByCompany">
+        select distinct a.ERNCD,
+                a.DESCR,
+                A.T2_PE_FLAG,
+                A.COMPANY,
+                A.IS_DELETED,
+                A.PAYMENT_TYPE,
+                a.FACTOR_MULT,
+                a.SEQNO,
+                a.T2_PE_EXCLUDE_GRID,
+                a.T2_PE_REDUCE_REG,
+                A.T2_PEO_ID,
+                A.T2_PE_401_ERCD_FLG,
+                A.T2_PE_SUP_ERNCD
+                from PS_T2_PE_ERNCMP_VW a
+                 where a.COMPANY in (:i_Companyid, ' ')
+                 and a.ERNCD IN (select distinct ERNCD from PS_T2_PE_CO_ERN_VW a1
+                                 where a1.company = :i_Companyid)
+    </sql-query>
+    <sql-query name="SQL.timesheetPayroll.getPayrollDeadline">                                                                
+        SELECT A.COMPANY,                                                                                                      
+            A.PAYGROUP,                                                                                                        
+            A.PAY_END_DT,                                                                                                      
+            A.T2_PP_REPORT_DT,                                                                                                
+                    CASE CNT.COUNTRY
+                        WHEN 'USA'
+                        THEN TO_CHAR(ENG.T2_WEB_TIME_DEADLN, 'HH12:MI:SS AM')
+                       ELSE TO_CHAR(ENG.T2_WEB_TIME_CAN, 'HH12:MI:SS AM')
+                    END AS WEB_DEADLINE,
+                    CASE CNT.COUNTRY
+                        WHEN 'USA'
+                        THEN TO_CHAR(ENG.T2_WEB_TIME_DEADLN, 'HH12:MI:SS AM')
+                        ELSE TO_CHAR(ENG.T2_WEB_TIME_CAN, 'HH12:MI:SS AM')
+                    END AS PREVIEW_DEADLN,
+                    CASE CNT.COUNTRY
+                        WHEN 'USA'
+                        THEN TO_CHAR(ENG.T2_WEB_OFF_US_DDLN, 'HH12:MI:SS AM')
+                        ELSE TO_CHAR(ENG.T2_WEB_OFF_CN_DDLN, 'HH12:MI:SS AM')
+                    END AS OFFCYCLE_WEB_DEADLINE,
+                    CASE CNT.COUNTRY
+                        WHEN 'USA'
+                        THEN TO_CHAR(ENG.T2_WEB_OFF_US_DDLN, 'HH12:MI:SS AM')
+                        ELSE TO_CHAR(ENG.T2_WEB_OFF_CN_DDLN, 'HH12:MI:SS AM')
+                    END AS OFFCYCLE_PREVIEW_DEADLN,
+            B.T2_TIME_ZONE,                                                                                                    
+            C.XLATLONGNAME                                                                                                    
+          FROM PS_T2_PAYROLL_HDR A,                                                                                            
+                PS_T2_CLIENTOPTION B, 
+                            PS_T2_PE_PEO_CNTRY CNT,
+                            PS_T2_ENG_SETTINGS ENG,
+                PSXLATITEM C                                                                                                  
+          WHERE A.OFF_CYCLE = 'N'                                                                                              
+            AND A.COMPANY = B.COMPANY                                                                                          
+            AND A.COMPANY =  :company                                                                                          
+            and A.PAY_END_DT = :payEndDate                                                                                    
+            and A.T2_PP_REPORT_DT = :reportDate                                                                                
+                    and B.PF_CORP = CNT.PF_CORP
+            and C.FIELDNAME = 'T2_TIME_ZONE'                                                                                  
+            and C.FIELDVALUE = B.T2_TIME_ZONE                                                                                  
+            and C.EFFDT = (SELECT max(C1.EFFDT) FROM PSXLATITEM C1                                                            
+                where C1.FIELDNAME = C.FIELDNAME                                                                              
+                and C1.FIELDVALUE = C.FIELDVALUE                                                                              
+                and C1.EFFDT &lt;= sysdate)                                                                                    
+            and C.EFF_STATUS = 'A'                                                                                            
+    </sql-query>
+    <sql-query name="SQL.payroll.deletePayrollEmployeePayLineItems">
+        DELETE FROM PS_T2_PE_PYRL_RPTD WHERE
+        COMPANY = :company
+        AND PAYGROUP = :payGroup
+        AND PAY_END_DT = :payEndDate
+        AND T2_HRP_PAYROLL_NUM = :payrollNumber
+        AND OFF_CYCLE = :offCycle
+        AND EMPLID = :employeeId
+    </sql-query>
+    <sql-query name="SQL.payroll.deleteEmployeeEarningRecords">
+        DELETE FROM PS_T2_PE_PYRL_RPTD WHERE
+        COMPANY = :company
+        AND PAYGROUP = :payGroup
+        AND PAY_END_DT = :payEndDate
+        AND T2_HRP_PAYROLL_NUM = :payrollNumber
+        AND OFF_CYCLE = :offCycle
+        AND EMPLID = :employeeId
+        AND T2_DUR &gt;= :startDate
+        AND T2_DUR &lt;= :endDate
+    </sql-query>
+    <sql-query name="SQL.payroll.deleteEmployeeCheckRecords">
+        DELETE FROM PS_T2_PE_PYRL_RPTD WHERE
+        COMPANY = :company
+        AND PAYGROUP = :payGroup
+        AND PAY_END_DT = :payEndDate
+        AND T2_HRP_PAYROLL_NUM = :payrollNumber
+        AND OFF_CYCLE = :offCycle
+        AND EMPLID = :employeeId
+        AND SEPCHK = :checkNumber
+    </sql-query>
+    <sql-query name="SQL.payroll.deleteEmployeeRecords">
+        DELETE FROM PS_T2_PE_PYRL_EMP WHERE
+        COMPANY = :company
+        AND PAYGROUP = :payGroup
+        AND PAY_END_DT = :payEndDate
+        AND T2_HRP_PAYROLL_NUM = :payrollNumber
+        AND OFF_CYCLE = :offCycle
+        AND EMPLID = :employeeId
+        AND START_DT = :startDate
+        AND END_DT = :endDate
+    </sql-query>
+    <sql-query name="SQL.payroll.deleteEmployeeLineItem">
+        DELETE FROM PS_T2_PE_PYRL_EMP WHERE
+        COMPANY = :company
+        AND PAYGROUP = :payGroup
+        AND PAY_END_DT = :payEndDate
+        AND T2_HRP_PAYROLL_NUM = :payrollNumber
+        AND OFF_CYCLE = :offCycle
+        AND EMPLID = :employeeId
+        AND T2_PE_LINE_NBR = :lineNumber
+    </sql-query>
+    <sql-query name="SQL.timesheetPayroll.getPayrollEntryEmployees">
+            SELECT  RT.COMPANY, RT.PAYGROUP, RT.PAY_END_DT, RT.OFF_CYCLE, RT.T2_HRP_PAYROLL_NUM, RT.PAGE_NUM,
+                    RT.LINE_NUM, RT.SEQNUM, RT.SEPCHK, RT.GROSSUP, RT.EMPLID,  RT.EMPL_RCD, RT.T2_DUR,  RT.DEPTID,
+                    RT.JOBCODE, RT.LOCATION, RT.ERNCD, RT.SEQNBR, RT.EARNS_BEGIN_DT, RT.EARNS_END_DT,
+                    RT.HOURS_EARNED, RT.DEDCD, RT.DED_CLASS, RT.AMOUNT, RT.T2_OVERRIDE_AMOUNT, RT.T2_PE_UNITS, RT.NAME, RT.EMPL_STATUS,
+                    RT.REG_TEMP, RT.FULL_PART_TIME, RT.EMPL_TYPE, RT.STD_HOURS, RT.STD_HRS_FREQUENCY,
+                    RT.HIRE_DT,
+                    CASE
+                        WHEN RT.EMPL_TYPE = 'S' THEN J.ANNUAL_RT
+                        WHEN RT.EMPL_TYPE = 'H' THEN J.HOURLY_RT
+                        ELSE 0
+                    END as PAY_RATE
+            FROM PS_T2_PE_PYRL_RPTD RT
+                LEFT OUTER JOIN PS_JOB J
+                    ON RT.COMPANY = J.COMPANY
+                    AND RT.EMPLID = J.EMPLID
+                    AND RT.PAYGROUP = J.PAYGROUP
+                    AND J.EMPL_STATUS IN ('A', 'I', 'U', 'L')
+                    AND J.EMPL_CLASS not in ('U','Z')
+            WHERE RT.COMPANY =  :company
+            AND RT.PAYGROUP = :payGroup
+            AND RT.PAY_END_DT = :payEndDt
+            AND J.EFFDT =
+                        (SELECT MAX(J_ED.EFFDT) FROM PS_JOB J_ED
+                            WHERE J.EMPLID = J_ED.EMPLID
+                            AND J.EMPL_RCD = J_ED.EMPL_RCD
+                            AND J_ED.EFFDT &lt;= RT.PAY_END_DT)
+            AND J.EFFSEQ =
+                         (SELECT MAX(J_ES.EFFSEQ) FROM PS_JOB J_ES
+                             WHERE J.EMPLID = J_ES.EMPLID
+                             AND J.EMPL_RCD = J_ES.EMPL_RCD
+                             AND J.EFFDT = J_ES.EFFDT)
+            ORDER BY RT.T2_DUR
+    </sql-query>
+
+    <sql-query name="SQL.timesheetPayroll.getClientOption">
+        SELECT A.T2_REVIEW_CUSTOMER, 
+            CASE C.COUNTRY
+                WHEN 'USA'
+                THEN TO_CHAR(D.T2_WEB_TIME_DEADLN, 'HH12:MI:SS AM')
+                ELSE TO_CHAR(D.T2_WEB_TIME_CAN, 'HH12:MI:SS AM')
+            END AS WEB_DEADLINE,
+            CASE C.COUNTRY
+                WHEN 'USA'
+                THEN TO_CHAR(D.T2_WEB_OFF_US_DDLN, 'HH12:MI:SS AM')
+                ELSE TO_CHAR(D.T2_WEB_OFF_CN_DDLN, 'HH12:MI:SS AM')
+            END AS OFFCYCLE_WEB_DEADLINE,
+            A.T2_TIME_ZONE,
+            B.XLATLONGNAME,
+            E.T2_PE_PYMT_METHOD,
+            E.T2_PROCESS_LEAD_DT,
+            A.T2_PEO_ID
+        FROM PS_T2_CLIENTOPTION A,
+            PSXLATITEM B,
+            PS_T2_PE_PEO_CNTRY C,
+            PS_T2_ENG_SETTINGS D,
+            PS_T2_PE_SPCL_LDDT E
+        WHERE A.COMPANY =  :company
+            and B.FIELDNAME = 'T2_TIME_ZONE'
+            and B.FIELDVALUE = A.T2_TIME_ZONE
+            and B.EFFDT = (SELECT max(B1.EFFDT) FROM PSXLATITEM B1
+            where B1.FIELDNAME = B.FIELDNAME
+            and B1.FIELDVALUE = B.FIELDVALUE
+            and B1.EFFDT &lt;= SYSDATE)
+            and B.EFF_STATUS = 'A'
+            AND C.PF_CORP    = A.PF_CORP
+            AND E.T2_PEO_ID =  CASE WHEN A.T2_PEO_ID = ' ' THEN 'PAS' ELSE A.T2_PEO_ID END
+            AND E.EFF_STATUS = 'A'
+            AND E.EFFDT = (select max(E1.EFFDT) FROM PS_T2_PE_SPCL_LDDT E1
+                WHERE E1.T2_PEO_ID = E.T2_PEO_ID
+                AND E1.EFFDT &lt;= SYSDATE
+                AND E1.EFF_STATUS = 'A')
+    </sql-query>
+
+    <sql-query name="SQL.PayrollEntry.getPayrollEntryValidators">
+            SELECT  TYPE,
+                ERNCD,
+                PAYMENT_TYPE,
+                EMPL_TYPE,
+                MIN_AMT,
+                MAX_AMT,
+                DESCRLONG,
+                MSG_SEVERITY
+                FROM PS_T2_PE_PYLMTS_VW
+                    WHERE COMPANY = :company
+                    AND PAYGROUP = :payGroup
+                    AND PAY_END_DT = :payEndDate
+                    AND OFF_CYCLE = :offCycle
+                    AND T2_HRP_PAYROLL_NUM = :payrollNumber
+                    AND PAY_FREQUENCY = :payFrequency
+    </sql-query>
+
+
+    <sql-query name="SQL.timesheetPayroll.isLeaveAccrualSystemClient">
+            select COMPONENT_VALUE from component_setup_steps where orgid = :company
+            and component_name = 'LEAVE_REQUEST' and component_value = 'Y'
+             AND SYSDATE  BETWEEN EFFDT AND ENDDT
+    </sql-query>
+
+    <sql-query name="SQL.payroll.dashboard.getPayrollGroup">
+           select
+                A.COMPANY,
+                A.PAYGROUP,
+                A.PAY_END_DT,
+                A.OFF_CYCLE,
+                A.T2_HRP_PAYROLL_NUM,
+                A.LOCATION,
+                A.DEPTID,
+                A.PAY_BEGIN_DT,
+                A.CHECK_DT,
+                A.DESCR,
+                A.PAY_FREQUENCY,
+                A.T2_PE_STATUS,
+                A.T2_PP_REPORT_DT,
+                A.T2_PE_BLACKOUT_FLG,
+                A.T2_PE_PAYROLL_NAME,
+                A.T2_OC_REASON_CD,
+                A.T2_PE_ENTRY_OPTN,
+                A.OPRID,
+                NVL(B.NAME, 'Admin') as OPR_NAME,
+                A.TIME_STAMP,
+                C.T2_PE_PYMT_METHOD,
+                A.SEQ_NBR,
+                C.T2_PE_DEL_OPTN,
+                C.T2_DEL_TYPE,
+                C.T2_PE_ADDR_OPTN,
+                C.ADDRESS1,
+                C.ADDRESS2,
+                C.CITY,
+                C.STATE,
+                C.COUNTRY,
+                C.POSTAL,
+                C.DESCR254,
+                C.ATTN_TO
+            FROM PS_T2_PE_PROCESS A
+                LEFT JOIN PS_PERSON_NAME B
+                    ON A.OPRID = B.EMPLID
+                LEFT JOIN PS_T2_PE_SPCL_ADDR C
+                    ON A.company = C.Company
+                    AND a.paygroup = C.paygroup
+                    AND a.off_cycle = a.off_cycle
+                    AND A.T2_HRP_PAYROLL_NUM = C.T2_HRP_PAYROLL_NUM
+            WHERE
+                    A.company = :company
+                    AND A.paygroup = :payGroup
+                    AND A.PAY_END_DT = :payEndDate
+                    AND A.off_cycle = :offCycle
+                    AND A.t2_hrp_payroll_num = :payrollNumber
+
+    </sql-query>
+
+    <sql-query name="SQL.payroll.dataentry.payroll.Employees">
+           SELECT DISTINCT
+                EMPLID, EMPL_RCD,
+                DEPTID, DESCR, JOBCODE, LOCATION, DESCR1,
+                LAST_NAME, FIRST_NAME, MIDDLE_NAME,
+                EMPL_STATUS, T2_EMPL_STS_DESCR,
+                REG_TEMP, FULL_PART_TIME, EMPL_TYPE,
+                EMPL_CLASS, HIRE_DT, TERMINATION_DT,
+                LAST_DATE_WORKED, US_WORK_ELIGIBILTY
+            FROM PS_T2_PE_PYRL_E_VW
+                 WHERE
+                   company = :company
+                   AND paygroup = :payGroup
+                   AND PAY_END_DT = :payEndDate
+                   AND off_cycle = :offCycle
+                   AND t2_hrp_payroll_num = :payrollNumber
+    </sql-query>
+
+    <sql-query name="SQL.payroll.dataentry.payroll.terminated.Employees">
+           SELECT DISTINCT
+                EMPLID, EMPL_RCD,
+                DEPTID, DESCR, JOBCODE, LOCATION, DESCR1,
+                LAST_NAME, FIRST_NAME, MIDDLE_NAME,
+                EMPL_STATUS, T2_EMPL_STS_DESCR,
+                REG_TEMP, FULL_PART_TIME, EMPL_TYPE,
+                EMPL_CLASS, HIRE_DT, TERMINATION_DT,
+                LAST_DATE_WORKED, US_WORK_ELIGIBILTY
+            FROM PS_T2_PE_PYRL_E_VW
+                 WHERE
+                   company = :company
+                   AND paygroup = :payGroup
+                   AND PAY_END_DT = :payEndDate
+                   AND off_cycle = :offCycle
+                   AND t2_hrp_payroll_num = :payrollNumber
+                   AND EMPL_STATUS = 'T'
+    </sql-query>
+
+   <!--  Payroll Data Entry  -->
+   <sql-query name="SQL.payroll.dataentry.getDefaultRegularEarnCodeByPayrollInstance" >
+      SELECT A.ERNCD_REG_HRS
+        FROM   PS_PAYGROUP_TBL A
+        WHERE  A.COMPANY = :company
+            AND A.PAYGROUP = :payGroup
+            AND A.EFFDT = (SELECT Max(A_ED.EFFDT)
+                           FROM   PS_PAYGROUP_TBL A_ED
+                           WHERE  A.COMPANY = A_ED.COMPANY
+                              AND A.PAYGROUP = A_ED.PAYGROUP
+                              AND A_ED.EFFDT &lt;= :payEndDate )
+   </sql-query>
+   <sql-query name="SQL.payroll.dataentry.findDepartmentsByPayrollInstance">
+         SELECT A.DEPTID,
+                A.DESCR,
+                A.DESCRSHORT
+        FROM   PS_DEPT_TBL A
+        WHERE  A.COMPANY = :company
+             AND SETID = 'USPEO'
+             AND EFF_STATUS = 'A'
+             AND A.EFFDT = (SELECT Max(A_ED.EFFDT)
+                          FROM   PS_DEPT_TBL A_ED
+                          WHERE  A.SETID = A_ED.SETID
+                                 AND A.DEPTID = A_ED.DEPTID
+                                 AND A_ED.EFFDT &lt;= :payEndDate )
+
+   </sql-query>
+   <sql-query name="SQL.payroll.dataentry.findDepartmentDistributionByPayrollInstance" >
+      SELECT
+          A.EMPLID,
+          A.EMPL_RCD,
+          B.DEPTID,
+          D.DESCR,
+          B.DIST_PCT
+          FROM PS_JOB A,
+          PS_PERSON_NAME C,
+          PS_JOB_EARNS_DIST B,
+          PS_DEPT_TBL D,
+          PS_SET_CNTRL_REC D2
+     WHERE A.COMPANY =  :company
+            AND A.PAYGROUP = :payGroup
+            AND EXISTS (SELECT 'X' FROM PS_T2_PE_PYRL_EMP A1
+                            WHERE A.COMPANY = A1.COMPANY
+                                        AND A.PAYGROUP = A1.PAYGROUP
+                                        AND A.EMPLID = A1.EMPLID
+                                        AND A.EMPL_RCD = A1.EMPL_RCD
+                                        AND A1.PAY_END_DT = :payEndDate)
+            AND D.DEPTID = B.DEPTID
+            AND D2.SETCNTRLVALUE = B.BUSINESS_UNIT
+            AND D2.RECNAME = 'DEPT_TBL'
+            AND D2.SETID = D.SETID
+            AND A.EFFDT =
+                  (SELECT MAX(A_ED.EFFDT) FROM PS_JOB A_ED
+                  WHERE A.EMPLID = A_ED.EMPLID
+                    AND A.EMPL_RCD = A_ED.EMPL_RCD
+                    AND A_ED.EFFDT &lt;= :payEndDate)
+              AND A.EFFSEQ =
+                  (SELECT MAX(A_ES.EFFSEQ) FROM PS_JOB A_ES
+                  WHERE A.EMPLID = A_ES.EMPLID
+                    AND A.EMPL_RCD = A_ES.EMPL_RCD
+                    AND A.EFFDT = A_ES.EFFDT)
+               AND A.EMPLID = B.EMPLID
+               AND A.EMPL_RCD = B.EMPL_RCD
+               AND B.EFFDT =
+                  (SELECT MAX(B_ED.EFFDT) FROM PS_JOB_EARNS_DIST B_ED
+                  WHERE B.EMPLID = B_ED.EMPLID
+                    AND B.EMPL_RCD = B_ED.EMPL_RCD
+                    AND B_ED.EFFDT &lt;= A.EFFDT)
+              AND B.EFFSEQ =
+                  (SELECT MAX(B_ES.EFFSEQ) FROM PS_JOB_EARNS_DIST B_ES
+                  WHERE B.EMPLID = B_ES.EMPLID
+                    AND B.EMPL_RCD = B_ES.EMPL_RCD
+                    AND B.EFFDT = B_ES.EFFDT)
+               AND A.EMPLID = C.EMPLID
+               AND D.EFFDT =
+                  (SELECT MAX(D_ED.EFFDT) FROM PS_DEPT_TBL D_ED
+                  WHERE D.SETID = D_ED.SETID
+                    AND D.DEPTID = D_ED.DEPTID
+                    AND D_ED.EFFDT &lt;= :payEndDate)
+
+   </sql-query>
+   <sql-query name="SQL.payroll.dataentry.findDepartmentDistributionByPayrollInstanceForEmployee" >
+      SELECT
+          A.EMPLID,
+          A.EMPL_RCD,
+          B.DEPTID,
+          D.DESCR,
+          B.DIST_PCT
+          FROM PS_JOB A,
+          PS_PERSON_NAME C,
+          PS_JOB_EARNS_DIST B,
+          PS_DEPT_TBL D,
+          PS_SET_CNTRL_REC D2
+     WHERE A.COMPANY =  :company
+            AND A.PAYGROUP = :payGroup
+            AND A.EMPLID = :emplid
+            AND EXISTS (SELECT 'X' FROM PS_T2_PE_PYRL_EMP A1
+                            WHERE A.COMPANY = A1.COMPANY
+                                        AND A.PAYGROUP = A1.PAYGROUP
+                                        AND A.EMPLID = A1.EMPLID
+                                        AND A.EMPL_RCD = A1.EMPL_RCD
+                                        AND A1.PAY_END_DT = :payEndDate)
+
+            AND D.DEPTID = B.DEPTID
+            AND D2.SETCNTRLVALUE = B.BUSINESS_UNIT
+            AND D2.RECNAME = 'DEPT_TBL'
+            AND D2.SETID = D.SETID
+            AND A.EFFDT =
+                  (SELECT MAX(A_ED.EFFDT) FROM PS_JOB A_ED
+                  WHERE A.EMPLID = A_ED.EMPLID
+                    AND A.EMPL_RCD = A_ED.EMPL_RCD
+                    AND A_ED.EFFDT &lt;= :payEndDate)
+              AND A.EFFSEQ =
+                  (SELECT MAX(A_ES.EFFSEQ) FROM PS_JOB A_ES
+                  WHERE A.EMPLID = A_ES.EMPLID
+                    AND A.EMPL_RCD = A_ES.EMPL_RCD
+                    AND A.EFFDT = A_ES.EFFDT)
+               AND A.EMPLID = B.EMPLID
+               AND A.EMPL_RCD = B.EMPL_RCD
+               AND B.EFFDT =
+                  (SELECT MAX(B_ED.EFFDT) FROM PS_JOB_EARNS_DIST B_ED
+                  WHERE B.EMPLID = B_ED.EMPLID
+                    AND B.EMPL_RCD = B_ED.EMPL_RCD
+                    AND B_ED.EFFDT &lt;= A.EFFDT)
+              AND B.EFFSEQ =
+                  (SELECT MAX(B_ES.EFFSEQ) FROM PS_JOB_EARNS_DIST B_ES
+                  WHERE B.EMPLID = B_ES.EMPLID
+                    AND B.EMPL_RCD = B_ES.EMPL_RCD
+                    AND B.EFFDT = B_ES.EFFDT)
+               AND A.EMPLID = C.EMPLID
+               AND D.EFFDT =
+                  (SELECT MAX(D_ED.EFFDT) FROM PS_DEPT_TBL D_ED
+                  WHERE D.SETID = D_ED.SETID
+                    AND D.DEPTID = D_ED.DEPTID
+                    AND D_ED.EFFDT &lt;= :payEndDate)
+
+   </sql-query>
+   <!--  Payroll Process SQL Queries Starts -->
+   <sql-query name="SQL.payroll.process.findProcessByID">
+     
+ SELECT P1.SEQ_NBR,
+              P1.COMPANY,
+              P1.PAYGROUP,
+              P1.PAY_BEGIN_DT,
+              P1.PAY_END_DT,
+              P1.OFF_CYCLE,
+              P1.T2_HRP_PAYROLL_NUM,
+              P1.PAY_FREQUENCY,
+              P1.T2_PE_STATUS,
+              P1.T2_PP_REPORT_DT,
+              P1.T2_PAYROLL_NUM,
+              P1.CHECK_DT,
+               '1' as isParent,
+               P1.LOCATION,
+               P1.DEPTID,
+		     nvl(PG2.T2_PE_CP_FLAG,'N') as T2_PE_CP_FLAG,
+		     nvl(PG2.T2_PE_JC_FLAG,'N') as T2_PE_JC_FLAG
+     from ps_t2_pe_process P1 
+   LEFT OUTER JOIN PS_T2_PE_PAYGRP_VW PG2
+           ON PG2.COMPANY = P1.COMPANY
+           AND PG2.PAYGROUP = P1.PAYGROUP 
+           AND PG2.PAY_END_DT = P1.PAY_END_DT
+		  AND PG2.EFF_STATUS = 'A'
+     where SEQ_NBR = :seqNumber
+    union
+    select SP.SEQ_NBR AS SEQ_NBR,
+              SP.COMPANY AS COMPANY,
+              SP.PAYGROUP AS PAYGROUP,
+              P.PAY_BEGIN_DT AS PAY_BEGIN_DT,
+              SP.PAY_END_DT AS PAY_END_DT,
+              SP.OFF_CYCLE AS OFF_CYCLE,
+              SP.T2_HRP_PAYROLL_NUM AS T2_HRP_PAYROLL_NUM,
+              P.PAY_FREQUENCY AS PAY_FREQUENCY,
+              SP.T2_PE_STATUS AS T2_PE_STATUS,
+              P.T2_PP_REPORT_DT AS T2_PP_REPORT_DT,
+              SP.T2_PAYROLL_NUM AS T2_PAYROLL_NUM,
+              P.CHECK_DT AS CHECK_DT,
+              '2' as isParent,
+              SP.Location AS LOCATION,
+              SP.Deptid AS DEPTID,
+		     nvl(PG2.T2_PE_CP_FLAG,'N') as T2_PE_CP_FLAG,
+		     nvl(PG2.T2_PE_JC_FLAG,'N') as T2_PE_JC_FLAG
+     from ps_t2_pe_sub_prcs SP,
+     ps_t2_pe_process P
+		LEFT OUTER JOIN PS_T2_PE_PAYGRP_VW PG2
+           ON PG2.COMPANY = P.COMPANY
+           AND PG2.PAYGROUP = P.PAYGROUP 
+           AND PG2.PAY_END_DT = P.PAY_END_DT
+		  AND PG2.EFF_STATUS = 'A'      
+     where SP.SEQ_NBR = :seqNumber
+     AND P.COMPANY = SP.COMPANY
+     AND P.PAYGROUP = SP.PAYGROUP
+     AND P.pay_end_dt = SP.pay_end_dt
+     AND P.off_cycle = SP.off_cycle
+     AND P.t2_payroll_num = SP.t2_payroll_num
+     AND P.t2_hrp_payroll_num = SP.t2_hrp_payroll_num
+
+    </sql-query>
+
+    <sql-query name="SQL.payroll.data.oncycle.AllEmployees">
+        SELECT EMPLID, EMPL_RCD,
+            DEPTID, DESCR, JOBCODE, LOCATION, DESCR1,
+            LAST_NAME, FIRST_NAME, MIDDLE_NAME,
+            EMPL_STATUS, T2_EMPL_STS_DESCR,
+            REG_TEMP, FULL_PART_TIME, EMPL_TYPE,
+            EMPL_CLASS, HIRE_DT, TERMINATION_DT,
+            LAST_DATE_WORKED, US_WORK_ELIGIBILTY
+        FROM PS_T2_PE_EMPON_VW WHERE
+        COMPANY = :company
+        and PAYGROUP = :payGroup
+        AND PAY_END_DT = :payEndDate
+        AND OFF_CYCLE = :offCycle
+        AND T2_HRP_PAYROLL_NUM = :payrollNumber
+    </sql-query>
+    <sql-query name="SQL.payroll.data.oncycle.Employees">
+        SELECT EMPLID, EMPL_RCD,
+            DEPTID, DESCR, JOBCODE, LOCATION, DESCR1,
+            LAST_NAME, FIRST_NAME, MIDDLE_NAME,
+            EMPL_STATUS, T2_EMPL_STS_DESCR,
+            REG_TEMP, FULL_PART_TIME, EMPL_TYPE,
+            EMPL_CLASS, HIRE_DT, TERMINATION_DT,
+            LAST_DATE_WORKED, US_WORK_ELIGIBILTY
+        FROM PS_T2_PE_EMPON_VW WHERE
+        COMPANY = :company
+        and PAYGROUP = :payGroup
+        AND PAY_END_DT = :payEndDate
+        AND OFF_CYCLE = :offCycle
+        AND T2_HRP_PAYROLL_NUM = :payrollNumber
+        AND EMPLID NOT IN (SELECT DISTINCT EMPLID
+                                            FROM PS_T2_PE_PYRL_EMP
+                                            WHERE COMPANY =  :company
+                                            AND PAYGROUP = :payGroup
+                                            AND PAY_END_DT = :payEndDate
+                                            AND OFF_CYCLE = :offCycle
+                                            AND T2_HRP_PAYROLL_NUM = :payrollNumber)
+    </sql-query>
+    <sql-query name="SQL.payroll.data.oncycle.terminated.Employees">
+        SELECT EMPLID, EMPL_RCD,
+            DEPTID, DESCR, JOBCODE, LOCATION, DESCR1,
+            LAST_NAME, FIRST_NAME, MIDDLE_NAME,
+            EMPL_STATUS, T2_EMPL_STS_DESCR,
+            REG_TEMP, FULL_PART_TIME, EMPL_TYPE,
+            EMPL_CLASS, HIRE_DT, TERMINATION_DT,
+            LAST_DATE_WORKED, US_WORK_ELIGIBILTY
+        FROM PS_T2_PE_EMPON_VW WHERE
+        COMPANY = :company
+        and PAYGROUP = :payGroup
+        AND PAY_END_DT = :payEndDate
+        AND OFF_CYCLE = :offCycle
+        AND T2_HRP_PAYROLL_NUM = :payrollNumber
+        AND EMPL_STATUS = 'T'
+    </sql-query>
+    <sql-query name="SQL.payroll.data.offcycle.Employees">
+        SELECT EMPLID, EMPL_RCD,
+            DEPTID, DESCR, JOBCODE, LOCATION, DESCR1,
+            LAST_NAME, FIRST_NAME, MIDDLE_NAME,
+            EMPL_STATUS, T2_EMPL_STS_DESCR,
+            REG_TEMP, FULL_PART_TIME, EMPL_TYPE,
+            EMPL_CLASS, HIRE_DT, TERMINATION_DT,
+            LAST_DATE_WORKED, US_WORK_ELIGIBILTY
+        FROM PS_T2_PE_EMPOFF_VW WHERE
+        COMPANY = :company
+        and PAYGROUP = :payGroup
+    </sql-query>
+    <sql-query name="SQL.payroll.data.company.Departments">
+        SELECT A.DEPTID,
+              A.DESCR,
+              A.DESCRSHORT,
+              A.LOCATION
+        FROM PS_DEPT_TBL A
+              WHERE A.COMPANY = :company
+              AND A.SETID = 'USPEO'
+              AND A.EFF_STATUS = 'A'
+              AND A.EFFDT = (SELECT MAX(A_ED.EFFDT)
+                                FROM PS_DEPT_TBL A_ED
+                                WHERE A.SETID = A_ED.SETID
+                                AND A.DEPTID = A_ED.DEPTID
+                                AND A_ED.EFFDT &lt;= :payEndDate)
+    </sql-query>
+
+    <sql-query name="SQL.payroll.data.employee.Departments">
+        SELECT EMPLID, EMPL_RCD,
+            DEPTID, DESCR, JOBCODE, LOCATION, DESCR1,
+            LAST_NAME, FIRST_NAME, MIDDLE_NAME,
+            EMPL_STATUS, T2_EMPL_STS_DESCR,
+            REG_TEMP, FULL_PART_TIME, EMPL_TYPE,
+            EMPL_CLASS, HIRE_DT, TERMINATION_DT,
+            LAST_DATE_WORKED, US_WORK_ELIGIBILTY
+        FROM PS_T2_PE_EMPOFF_VW WHERE
+        COMPANY = :company
+        and PAYGROUP = :payGroup
+    </sql-query>
+    <sql-query name="SQL.payroll.data.employee.PendingLeaves">
+        SELECT DISTINCT B.EMPLID,
+                D.T2_LEAVE_STATUS STATUS, E.LEAVE_DT, e.ERNCD, E.T2_REQUEST_HOURS
+             FROM PS_T2_PE_PROCESS A
+               INNER JOIN PS_T2_PE_PYRL_EMP B
+                  ON     B.company = A.company
+                     AND B.PAYGROUP = A.PAYGROUP
+                     AND B.PAY_END_DT = A.PAY_END_DT
+                     AND B.OFF_CYCLE = A.OFF_CYCLE
+               INNER JOIN PS_T2_PER_LV_RQST D
+                  ON     D.EMPLID = B.emplid
+                     AND D.company = A.COMPANY
+                     AND D.T2_LEAVE_STATUS IN ('X', 'W')
+               INNER JOIN PS_T2_PER_LV_RQ_DT E
+                  ON     E.EMPLID = D.EMPLID
+                     AND E.T2_HRP_POSITIONID = D.T2_HRP_POSITIONID
+                     AND E.COMPANY = D.COMPANY
+                     AND E.REQUEST_NBR = D.REQUEST_NBR
+                     AND E.LEAVE_DT &lt;= A.PAY_END_DT
+             where A.COMPANY = :company
+                and A.PAYGROUP = :payGroup
+                AND A.PAY_END_DT = :payEndDate
+                and A.OFF_CYCLE = :offCycle
+                and A.T2_PAYROLL_NUM = :payrollNumber
+    </sql-query>
+    <sql-query name="SQL.payroll.data.payrollenginee.NextStep">
+    	select T2_RUN_ID_NEXT, T2_FLAG from PS_T2_PAY_STAT_RUN
+		  where company = :company
+		    and T2_PAY_RUN_TYPE = :runType
+		    and T2_PE_STATUS = :status
+		UNION
+		select c.T2_RUN_ID_NEXT, c.T2_FLAG from PS_T2_CLIENTOPTION a,
+		              PS_T2_PAY_RUN_MAP b,
+		              PS_T2_PAY_STAT_RUN c
+		where a.company = :company
+		  AND a.T2_TIME_ATTENDANCE = b.T2_TIME_ATTENDANCE
+		  and b.COMPANY = C.COMPANY
+		  and c.T2_PAY_RUN_TYPE = :runType
+		  and c.T2_PE_STATUS = :status
+		  and not exists (select 'X' from PS_T2_PAY_STAT_RUN
+		                    where company = :company
+		                    and T2_PAY_RUN_TYPE = :runType
+		                    and T2_PE_STATUS = :status)
+    </sql-query>
+    <sql-query name="SQL.payroll.data.payroll.UpdateDataEntryOption">
+        update ps_t2_pe_process
+            set T2_PE_ENTRY_OPTN = :dataEntryOption,
+            OPRID = :operatorId,
+            TIME_STAMP = SYSDATE
+        where company = :company
+            and PAYGROUP = :payGroup
+            AND OFF_CYCLE = :offCycle
+            AND T2_HRP_PAYROLL_NUM = :payrollNumber
+            AND PAY_END_DT = :payEndDate
+    </sql-query>
+    <sql-query name="SQL.payroll.data.payroll.UpdateStatus">
+        update ps_t2_pe_process
+            set T2_PE_STATUS = :status,
+            OPRID = :operatorId,
+            TIME_STAMP = SYSDATE
+        where company = :company
+            and PAYGROUP = :payGroup
+            AND OFF_CYCLE = :offCycle
+            AND T2_HRP_PAYROLL_NUM = :payrollNumber
+            AND PAY_END_DT = :payEndDate
+    </sql-query>
+    <sql-query name="SQL.payroll.data.payroll.DeletePayRecords">
+        DELETE FROM PS_T2_PE_PAY_TBL
+            WHERE company = :company
+            and PAYGROUP = :payGroup
+            AND PAY_END_DT = :payEndDate
+            AND OFF_CYCLE = :offCycle
+            AND T2_HRP_PAYROLL_NUM = :payrollNumber
+    </sql-query>
+    <sql-query name="SQL.payroll.preview.getPayrollEngineStatus">
+           SELECT DISTINCT A.COMPANY, A.PAYGROUP, A.PAY_END_DT, A.OFF_CYCLE,
+                A.T2_HRP_PAYROLL_NUM, A.LOCATION, A.DEPTID, A.PAY_BEGIN_DT,
+                A.CHECK_DT, A.DESCR, A.PAY_FREQUENCY, A.T2_PE_STATUS,
+                A.T2_PP_REPORT_DT, A.T2_PE_BLACKOUT_FLG, A.T2_PE_PAYROLL_NAME,
+                A.T2_OC_REASON_CD, A.T2_PE_ENTRY_OPTN, A.OPRID, NVL(B.NAME, 'Admin') as OPR_NAME,
+                A.TIME_STAMP, C.T2_PE_PYMT_METHOD, A.SEQ_NBR, D.T2_RUN_ID,
+                CASE NVL(E.T2_RUN_ID, 'NOT-ERROR') WHEN 'NOT-ERROR' THEN 0  ELSE 1 END AS IS_ERROR_CD,
+                NVL(G.MESSAGE_PARM, NVL(H.MESSAGE_PARM, F.MESSAGE_TEXT_WRK)) as MESSAGE_TEXT
+            FROM ps_t2_pe_process A
+                LEFT JOIN PS_PERSON_NAME B
+                    ON A.OPRID = B.EMPLID
+                LEFT JOIN PS_T2_PE_SPCL_ADDR C
+                    ON A.company = C.Company
+                    AND A.paygroup = C.paygroup
+                    AND A.off_cycle = C.off_cycle
+                    AND A.T2_HRP_PAYROLL_NUM = C.T2_HRP_PAYROLL_NUM
+                LEFT JOIN PS_T2_ENG_METRICS D
+                    on A.COMPANY = D.COMPANY
+                    AND A.PAYGROUP = D.PAYGROUP
+                    AND A.PAY_END_DT = D.PAY_END_DT
+                    AND A.T2_PAYROLL_NUM = D.T2_PAYROLL_NUM
+                LEFT OUTER JOIN PS_T2_PE_RUN_ID_VW E
+                    ON D.T2_RUN_ID = E.T2_RUN_ID
+                LEFT OUTER JOIN PS_T2_PE_ERRMSG_ID F
+                    ON D.T2_RUN_ID = F.T2_RUN_ID
+                    AND F.EFF_STATUS = 'A'
+                    AND F.EFFDT &lt;= A.PAY_END_DT
+                Left outer join  PS_T2_PE_ERRMG_CMP G
+                    on F.T2_RUN_ID = G.T2_RUN_ID
+                    and G.EFFDT &lt;= A.PAY_END_DT
+                    and G.company = A.COMPANY
+                Left outer join  PS_T2_PE_ERRMG_BRD H
+                    on F.T2_RUN_ID = H.T2_RUN_ID
+                    and H.EFFDT &lt;= A.PAY_END_DT
+            WHERE A.COMPANY = :company
+            AND A.PAYGROUP = :payGroup
+            AND A.PAY_END_DT = :payEndDate
+            AND A.OFF_CYCLE = :offCycle
+            AND A.T2_HRP_PAYROLL_NUM = :payrollNumber
+            AND D.T2_SEQ_NUM = (select max(T2_SEQ_NUM)
+                            FROM PS_T2_ENG_METRICS D1
+                            where D1.COMPANY = D.COMPANY
+                            AND D1.PAYGROUP = D.PAYGROUP
+                            AND D1.PAY_END_DT = D.PAY_END_DT
+                            AND D1.T2_PAYROLL_NUM = D.T2_PAYROLL_NUM)
+            AND (H.T2_PEO_ID IS NULL
+                    OR H.T2_PEO_ID = (SELECT CASE X.T2_PEO_ID
+                                            WHEN ' ' THEN 'PAS'
+                                            ELSE X.T2_PEO_ID
+                                            END CASE
+                                        FROM PS_T2_CLIENTOPTION X
+                                        WHERE X.T2_COMP_TERM_DT IS NULL
+                                        AND X.COMPANY = A.COMPANY))
+    </sql-query>
+    <sql-query name="SQL.payroll.data.payroll.DeletePayrollDataView">
+        DELETE FROM PS_T2_PE_PREVW_STG
+            WHERE company = :company
+            and PAYGROUP = :payGroup
+            AND PAY_END_DT = :payEndDate
+            AND OFF_CYCLE = :offCycle
+            AND T2_HRP_PAYROLL_NUM = :payrollNumber
+    </sql-query>
+    <sql-query name="SQL.payroll.data.payroll.GetPayrollDataView">
+        SELECT T2_PE_PREVIEW_DATA FROM PS_T2_PE_PREVW_STG
+            WHERE company = :company
+            and PAYGROUP = :payGroup
+            AND PAY_END_DT = :payEndDate
+            AND OFF_CYCLE = :offCycle
+            AND T2_HRP_PAYROLL_NUM = :payrollNumber
+            AND TYPE = :type
+    </sql-query>
+    <sql-query name="SQL.payroll.company.address">
+        SELECT  A.ADDRESS1 || ', ' ||
+                case when A.ADDRESS2 !=' ' then  A.ADDRESS2 || ', ' end
+                || A.CITY || ', ' || A.STATE ||  ', ' || a.country || ', ' || a.postal
+            FROM PS_COMPANY_TBL A
+            WHERE A.EFFDT =
+                (SELECT MAX(A_ED.EFFDT) FROM PS_COMPANY_TBL A_ED
+                WHERE A.COMPANY = A_ED.COMPANY
+                AND A_ED.EFFDT &lt;= SYSDATE)
+            AND A.COMPANY = :company
+    </sql-query>
+
+    <sql-query name="SQL.payroll.security.getTopUserRole">
+
+        Select distinct a.S_ROLE
+          from ALLROLES_VW@HPDB_HRDB a,
+               PS_T2_PE_ROLES b
+        where a.ORGID = :company
+        and a.Personid = :personId
+        AND a.S_ROLE = b.ROLENAME
+        AND b.PRECEDENCE_ORDER = (SELECT MIN(b1.PRECEDENCE_ORDER)FROM PS_T2_PE_Roles b1
+                                      WHERE b1.ROLENAME IN (Select distinct S_ROLE
+                                          from ALLROLES_VW@HPDB_HRDB
+                                              where ORGID = :company
+                                              and Personid = :personId))
+    </sql-query>
+    <sql-query name="SQL.payroll.security.getAllUserRoles">
+        SELECT DISTINCT a.S_ROLE FROM ALLROLES_VW@HPDB_HRDB a
+            WHERE a.ORGID          = :company
+            AND a.Personid         = :personId
+    </sql-query>
+
+    <sql-query name="SQL.payroll.security.getUserPermissions">
+
+        SELECT DISTINCT d.ROLENAME, d.T2_PEO_ID, b.PRECEDENCE_ORDER,
+                d.COMPONENT_TITLE, d.T2_PE_VIEW, d.T2_PE_EDIT
+        FROM PS_T2_CLIENTOPTION a,
+             PS_T2_PE_ROLES b,
+             PS_T2_pe_role_brnd c,
+             PS_T2_PE_ROLE_COMP d,
+             PS_T2_PE_COMP_DATA e
+        WHERE a.COMPANY = :company
+          AND b.ROLENAME = :userRole
+          AND c.ROLENAME   = b.ROLENAME
+          AND c.T2_PEO_ID = CASE a.T2_PEO_ID WHEN ' '  THEN 'PAS' ELSE a.T2_PEO_ID  END
+          AND c.EFF_STATUS = 'A'
+          AND c.EFFDT = (select MAX(c1.EFFDT) FROM PS_T2_pe_role_brnd c1
+                            WHERE d.ROLENAME   = c1.ROLENAME
+                            AND c.T2_PEO_ID = c1.T2_PEO_ID
+                            AND c.EFF_STATUS = c1.EFF_STATUS
+                            AND c1.EFFDT &lt;= sysdate)
+          AND d.ROLENAME   = c.ROLENAME
+          AND d.T2_PEO_ID = c.T2_PEO_ID
+          AND d.EFFDT  = (select MAX(d1.EFFDT) FROM PS_T2_pe_role_comp d1
+                            WHERE d.ROLENAME   = d1.ROLENAME
+                            AND d.T2_PEO_ID = d1.T2_PEO_ID
+                            AND d1.EFFDT &lt;= sysdate)
+          AND e.COMPONENT_TITLE   = d.COMPONENT_TITLE
+          AND e.EFF_STATUS       = 'A'
+          AND e.EFFDT = (select MAX(e1.EFFDT) FROM PS_T2_PE_COMP_DATA e1
+                            WHERE e.COMPONENT_TITLE   = e1.COMPONENT_TITLE
+                            AND e.EFF_STATUS = e1.EFF_STATUS
+                            AND e1.EFFDT &lt;= sysdate)
+        UNION
+        SELECT DISTINCT d.ROLENAME, d.T2_PEO_ID, b.PRECEDENCE_ORDER,
+              d.COMPONENT_TITLE, d.T2_PE_VIEW, d.T2_PE_EDIT
+        FROM PS_T2_PE_Roles b,
+             PS_T2_pe_role_brnd c,
+             PS_T2_pe_role_comp d,
+             PS_T2_PE_COMP_DATA e
+        WHERE b.ROLENAME = :userRole
+          AND c.ROLENAME   = b.ROLENAME
+          AND c.T2_PEO_ID = 'DEF'
+          AND c.EFF_STATUS = 'A'
+          AND c.EFFDT = (select MAX(c1.EFFDT) FROM PS_T2_pe_role_brnd c1
+                            WHERE d.ROLENAME   = c1.ROLENAME
+                            AND c.T2_PEO_ID = c1.T2_PEO_ID
+                            AND c.EFF_STATUS = c1.EFF_STATUS
+                            AND c1.EFFDT  &lt;= sysdate)
+          AND d.ROLENAME   = c.ROLENAME
+          AND d.T2_PEO_ID = c.T2_PEO_ID
+          AND d.EFFDT  = (select MAX(d1.EFFDT) FROM PS_T2_pe_role_comp d1
+                            WHERE d.ROLENAME   = d1.ROLENAME
+                            AND d.T2_PEO_ID = d1.T2_PEO_ID
+                            AND d1.EFFDT &lt;= sysdate)
+          AND e.COMPONENT_TITLE   = d.COMPONENT_TITLE
+          AND e.EFF_STATUS       = 'A'
+          AND e.EFFDT = (select MAX(e1.EFFDT) FROM PS_T2_PE_COMP_DATA e1
+                            WHERE e.COMPONENT_TITLE   = e1.COMPONENT_TITLE
+                            AND e.EFF_STATUS = e1.EFF_STATUS
+                            AND e1.EFFDT &lt;= sysdate)
+          AND NOT EXISTS (
+              SELECT 'X'
+              FROM PS_T2_CLIENTOPTION a1,
+                   PS_T2_PE_Roles b1,
+                   PS_T2_pe_role_brnd c1,
+                   PS_T2_pe_role_comp d1,
+                   PS_T2_PE_COMP_DATA e1
+              WHERE a1.COMPANY = :company
+                AND b1.ROLENAME = :userRole
+                AND c1.ROLENAME   = b1.ROLENAME
+                AND c1.T2_PEO_ID = CASE a1.T2_PEO_ID WHEN ' '  THEN 'PAS' ELSE a1.T2_PEO_ID  END
+                AND c1.EFF_STATUS = 'A'
+                AND c1.EFFDT = (select MAX(c2.EFFDT) FROM PS_T2_pe_role_brnd c2
+                                  WHERE d1.ROLENAME   = c2.ROLENAME
+                                  AND c1.T2_PEO_ID = c2.T2_PEO_ID
+                                  AND c1.EFF_STATUS = c2.EFF_STATUS
+                                  AND c2.EFFDT  &lt;= sysdate)
+                AND d1.ROLENAME   = c1.ROLENAME
+                AND d1.T2_PEO_ID = c1.T2_PEO_ID
+                AND d1.EFFDT  = (select MAX(d2.EFFDT) FROM PS_T2_pe_role_comp d2
+                                  WHERE d1.ROLENAME   = d2.ROLENAME
+                                  AND d1.T2_PEO_ID = d2.T2_PEO_ID
+                                  AND d2.EFFDT  &lt;= sysdate)
+                AND e1.COMPONENT_TITLE   = d1.COMPONENT_TITLE
+                AND e1.EFF_STATUS       = 'A'
+                AND e1.EFFDT = (select MAX(e2.EFFDT) FROM PS_T2_PE_COMP_DATA e2
+                                  WHERE e1.COMPONENT_TITLE   = e2.COMPONENT_TITLE
+                                  AND e1.EFF_STATUS = e2.EFF_STATUS
+                                  AND e2.EFFDT &lt;= sysdate
+                AND d1.ROLENAME = d.ROLENAME
+                AND b1.PRECEDENCE_ORDER = b.PRECEDENCE_ORDER
+            AND d1.COMPONENT_TITLE = d.COMPONENT_TITLE
+                )
+          )
+    </sql-query>
+    <sql-query name="SQL.payroll.earning.codes">
+        SELECT * FROM PS_T2_PE_PYRL_ERCD
+            WHERE company = :company
+            and PAYGROUP = :payGroup
+            AND PAY_END_DT = :payEndDate
+            AND OFF_CYCLE = :offCycle
+            AND T2_HRP_PAYROLL_NUM = :payrollNumber
+            AND T2_PE_STATUS_CD != 'D'
+    </sql-query>
+    <sql-query name="SQL.payroll.deletePayrollEarningCodes">
+        DELETE FROM PS_T2_PE_PYRL_ERCD WHERE
+        COMPANY = :company
+        AND PAYGROUP = :payGroup
+        AND PAY_END_DT = :payEndDate
+        AND T2_HRP_PAYROLL_NUM = :payrollNumber
+        AND OFF_CYCLE = :offCycle
+    </sql-query>
+     <sql-query name="SQL.payroll.entry.employee">
+        SELECT a.EMPLID, a.HOURS_EARNED
+         FROM PS_T2_PE_PYRL_RPTD a,
+            PS_T2_PE_process b
+        WHERE A.company = b.company
+            AND A.paygroup = b.paygroup
+            AND A.PAY_END_DT = b.PAY_END_DT
+            AND A.off_cycle = b.off_Cycle
+            AND A.t2_hrp_payroll_num = b.t2_hrp_payroll_num
+            and b.seq_nbr = :id
+            AND a.EMPLID = :employeeId
+            AND (a.HOURS_EARNED != 0
+                OR a.T2_PE_AMOUNT != 0
+                OR a.T2_PE_UNITS != 0 )
+    </sql-query>
+    <sql-query name="SQL.payroll.getPayrollBlackoutTime">
+        SELECT B.COMPANY,
+            CASE D.COUNTRY
+                WHEN 'USA'
+                THEN TO_CHAR(E.T2_WEB_TIME_DEADLN, 'HH12:MI:SS AM')
+                ELSE TO_CHAR(E.T2_WEB_TIME_CAN, 'HH12:MI:SS AM')
+            END AS WEB_DEADLINE,
+           CASE C.COUNTRY
+                WHEN 'USA'
+                THEN TO_CHAR(E.T2_WEB_OFF_US_DDLN, 'HH12:MI:SS AM')
+                ELSE TO_CHAR(E.T2_WEB_OFF_CN_DDLN, 'HH12:MI:SS AM')
+            END AS OFFCYCLE_WEB_DEADLINE,
+            D.T2_PE_PRVW_HOURS,
+            D.T2_PE_PRVW_MINS,
+            B.T2_TIME_ZONE,
+            X.XLATLONGNAME,
+            B.T2_DFLT_TIME
+            FROM PS_T2_PE_PROCESS A,
+              PS_T2_CLIENTOPTION B,
+              PS_T2_PE_PEO_CNTRY C,
+              PS_T2_PE_BLACKOUT D,
+              PS_T2_ENG_SETTINGS E,
+              PSXLATITEM X
+            WHERE A.COMPANY          = :company
+            AND A.PAYGROUP           = :payGroup
+            AND A.PAY_END_DT         = :payEndDate
+            AND A.OFF_CYCLE          = :offCycle
+            AND A.T2_HRP_PAYROLL_NUM = :payrollNumber
+            AND B.COMPANY            = A.COMPANY
+            AND C.PF_CORP            = B.PF_CORP
+            AND D.ON_OR_OFF          =
+              CASE A.OFF_CYCLE
+                WHEN 'N'
+                THEN 'ON'
+                ELSE 'OFF'
+              END
+            AND D.T2_PEO_ID =
+              CASE B.T2_PEO_ID
+                WHEN ' '
+                THEN 'PAS'
+                ELSE B.T2_PEO_ID
+              END
+            AND D.COUNTRY = C.COUNTRY
+            and X.FIELDNAME = 'T2_TIME_ZONE'
+            and X.FIELDVALUE = B.T2_TIME_ZONE
+            and X.EFFDT = (SELECT max(X1.EFFDT) FROM PSXLATITEM X1
+                                    where X1.FIELDNAME = X.FIELDNAME
+                                    and X1.FIELDVALUE = X.FIELDVALUE
+                                    and X1.EFFDT &lt;= sysdate)
+            and X.EFF_STATUS = 'A'
+    </sql-query>
+
+    <sql-query name="SQL.payroll.process.getPayrollStatus">
+        select FIELDVALUE, XLATLONGNAME from PSXLATITEM where FIELDNAME='T2_PE_STATUS'
+        AND FIELDVALUE in ('A','B','C','F','I','L','M','N','R','S')
+    </sql-query>
+
+    <sql-query name="SQL.paytimereport.payroll.findProcessBySearchCriteria">
+        SELECT DAT.T2_PE_TYPE,
+            DAT.COMPANY,
+            DAT.PAYGROUP,
+            DAT.PAY_BEGIN_DT,
+            DAT.PAY_END_DT,
+            DAT.OFF_CYCLE,
+            DAT.T2_HRP_PAYROLL_NUM,
+            DAT.PAY_FREQUENCY,
+            DAT.T2_PP_REPORT_DT,
+            DAT.PAYGROUP_DESCR,
+            DAT.LOCATION,
+            DAT.T2_PE_LOC_DESCR,
+            DAT.DEPTID,
+            DAT.T2_PE_DEPT_DESCR,
+            DAT.PARENT_STATUS,
+            DAT.CHILD_STATUS,
+            DAT.PARENT_STAT_DESCR,
+            DAT.CHILD_STAT_DESCR,
+            DAT.T2_PE_PAYROLL_NAME,
+            DAT.T2_OC_REASON_CD,
+            DAT.T2_PE_ENTRY_OPTN,
+            DAT.CHECK_DT,
+            DAT.T2_PE_BLACKOUT_FLG,
+            DAT.T2_RUN_ID,
+            DAT.T2_PE_PYMT_METHOD,
+            DAT.PARENT_OPRID,
+            DAT.CHILD_OPRID,
+            DAT.PARENT_OPR_NAME,
+            DAT.CHILD_OPR_NAME,
+            DAT.PARENT_TIME_STAMP,
+            DAT.CHILD_TIMESTAMP,
+            DAT.ERNCD_REG_HRS,
+   			DAT.T2_PE_CP_FLAG,
+       		DAT.T2_PE_JC_FLAG,            
+            DAT.LEAVE_REQUEST,
+			DAT.COMP_DESCR,
+            DAT.SEQ_NBR FROM (SELECT
+            '1' AS T2_PE_TYPE,
+            a.COMPANY,
+            a.PAYGROUP,
+            a.PAY_BEGIN_DT,
+            a.PAY_END_DT,
+            a.OFF_CYCLE,
+            a.T2_HRP_PAYROLL_NUM,
+            a.PAY_FREQUENCY,
+            a.T2_PP_REPORT_DT,
+            PG.DESCR AS PAYGROUP_DESCR,
+            a.LOCATION,
+            c.DESCR AS T2_PE_LOC_DESCR,
+            a.DEPTID,
+            c1.DESCR AS T2_PE_DEPT_DESCR,
+            a.T2_PE_STATUS AS PARENT_STATUS,
+            '' AS CHILD_STATUS,
+            A1.XLATLONGNAME AS PARENT_STAT_DESCR,
+            '' AS CHILD_STAT_DESCR,
+            a.T2_PE_PAYROLL_NAME,
+            a.T2_OC_REASON_CD,
+            a.T2_PE_ENTRY_OPTN,
+            a.CHECK_DT,
+            a.T2_PE_BLACKOUT_FLG,
+            MTX.T2_RUN_ID,
+            H.T2_PE_PYMT_METHOD,
+            a.OPRID AS PARENT_OPRID,
+            '' AS CHILD_OPRID,
+            N.NAME AS PARENT_OPR_NAME,
+            '' AS CHILD_OPR_NAME,
+            a.TIME_STAMP AS PARENT_TIME_STAMP,
+            NULL AS CHILD_TIMESTAMP,
+            PG.ERNCD_REG_HRS,
+			nvl(CPJC.T2_PE_CP_FLAG,'N') as T2_PE_CP_FLAG,
+			nvl(CPJC.T2_PE_JC_FLAG,'N') as T2_PE_JC_FLAG,
+            NVL(css.Component_value, 'N') leave_request,
+            cmp.descr AS COMP_DESCR,
+            a.SEQ_NBR
+            FROM PS_T2_PE_PROCESS a
+            INNER JOIN PS_PAYGROUP_TBL PG ON PG.COMPANY = a.COMPANY
+                    AND PG.PAYGROUP = a.PAYGROUP
+                    AND PG.EFFDT = (SELECT MAX(PG_ED.EFFDT) FROM PS_PAYGROUP_TBL PG_ED
+                            WHERE PG.COMPANY = PG_ED.COMPANY
+                              AND PG.PAYGROUP = PG_ED.PAYGROUP
+                              AND PG_ED.EFFDT &lt;= a.PAY_END_DT)
+         	LEFT OUTER JOIN PS_T2_PE_PAYGRP_VW CPJC
+            ON a.COMPANY = CPJC.COMPANY
+            AND a.PAYGROUP = CPJC.PAYGROUP
+            AND CPJC.PAY_END_DT = a.PAY_END_DT
+            AND CPJC.EFF_STATUS = 'A'                              
+            LEFT OUTER JOIN PS_LOCATION_TBL c ON a.LOCATION = c.LOCATION
+            LEFT OUTER JOIN PS_DEPT_TBL c1 ON a.DEPTID = c1.DEPTID
+            LEFT OUTER JOIN PS_PERSON_NAME N ON a.OPRID = N.EMPLID
+            INNER JOIN psxlatitem a1 ON A1.FIELDNAME = 'T2_PE_STATUS' AND A1.FIELDVALUE = A.T2_PE_STATUS
+            LEFT OUTER JOIN PS_T2_ENG_METRICS MTX
+                    ON a.COMPANY = MTX.COMPANY
+                    AND a.PAYGROUP = MTX.PAYGROUP
+                    AND a.PAY_END_DT = MTX.PAY_END_DT
+                    AND a.T2_PAYROLL_NUM = MTX.T2_PAYROLL_NUM
+            LEFT OUTER JOIN PS_T2_PE_SPCL_ADDR H
+                    ON a.COMPANY = H.COMPANY
+                    AND a.PAYGROUP = H.PAYGROUP
+                    AND a.PAY_END_DT = H.PAY_END_DT
+                    AND a.OFF_CYCLE = H.OFF_CYCLE
+                    AND a.T2_HRP_PAYROLL_NUM = H.T2_HRP_PAYROLL_NUM
+			LEFT OUTER JOIN component_setup_steps@hpdb_hrdb css
+                    ON a.COMPANY = css.orgid
+                    AND sysdate BETWEEN css.effdt AND css.ENDDT
+                    AND css.component_name ='LEAVE_REQUEST'
+			, PS_COMPANY_TBL cmp
+            WHERE a.OFF_CYCLE = :offCycle
+            and a.T2_PE_STATUS != 'D'
+            AND a.company = :company
+            AND (:payrollName is null OR UPPER(TRIM(a.T2_PE_PAYROLL_NAME)) like :payrollName)
+            AND (:payFrequency is null OR a.pay_frequency = :payFrequency)
+            AND ((:oprId is null OR UPPER(a.OPRID) = :oprId) OR (:oprName is null OR UPPER(N.NAME) like :oprName))
+            AND (:startDate is null OR case when :offCycle = 'N' then TO_CHAR(a.PAY_END_DT, 'YYYY-MM-DD') else TO_CHAR(a.CHECK_DT, 'YYYY-MM-DD') end &gt;= :startDate)
+            AND (:endDate is null OR case when :offCycle = 'N' then TO_CHAR(a.PAY_END_DT, 'YYYY-MM-DD') else TO_CHAR(a.CHECK_DT, 'YYYY-MM-DD') end &lt;= :endDate)
+            AND cmp.EFFDT = (SELECT MAX(c1.EFFDT) FROM PS_COMPANY_TBL c1
+                            WHERE cmp.COMPANY = c1.COMPANY
+                            and c1.EFF_STATUS = 'A')
+            AND a.company = cmp.COMPANY
+            AND (MTX.T2_SEQ_NUM IS NULL
+                   OR MTX.T2_SEQ_NUM =(SELECT MAX(T2_SEQ_NUM) FROM PS_T2_ENG_METRICS C1
+                                       WHERE C1.COMPANY = MTX.COMPANY
+                                         AND C1.PAYGROUP = MTX.PAYGROUP
+                                         AND C1.PAY_END_DT = MTX.PAY_END_DT
+                                         AND C1.T2_PAYROLL_NUM = MTX.T2_PAYROLL_NUM))
+			AND (css.uniqueid IS NULL
+					OR css.uniqueid = (SELECT MAX(css1.uniqueid) FROM component_setup_steps@hpdb_hrdb css1
+                                        WHERE css.orgid = css1.orgid
+                                        	AND css.component_name = css1.component_name
+                                        	AND css1.enddt &gt;= sysdate))
+        UNION
+        SELECT
+            '2' AS T2_PE_TYPE,
+            b.COMPANY,
+            b.PAYGROUP,
+            prc.PAY_BEGIN_DT,
+            b.PAY_END_DT,
+            b.OFF_CYCLE,
+            b.T2_HRP_PAYROLL_NUM,
+            PRC.PAY_FREQUENCY,
+            PRC.T2_PP_REPORT_DT,
+            PG.DESCR AS PAYGROUP_DESCR,
+            b.LOCATION,
+            d.DESCR AS T2_PE_LOC_DESCR,
+            b.DEPTID,
+            d1.DESCR AS T2_PE_DEPT_DESCR,
+            PRC.T2_PE_STATUS AS PARENT_STATUS,
+            b.T2_PE_STATUS AS CHILD_STATUS,
+            A2.XLATLONGNAME AS PARENT_STAT_DESCR,
+            A1.XLATLONGNAME AS CHILD_STAT_DESCR,
+            PRC.T2_PE_PAYROLL_NAME,
+            PRC.T2_OC_REASON_CD,
+            PRC.T2_PE_ENTRY_OPTN,
+            PRC.CHECK_DT,
+            PRC.T2_PE_BLACKOUT_FLG,
+            MTX.T2_RUN_ID,
+            H.T2_PE_PYMT_METHOD,
+            PRC.OPRID AS PARENT_OPRID,
+            b.OPRID AS CHILD_OPRID,
+            N.NAME AS PARENT_OPR_NAME,
+            N1.NAME AS CHILD_OPR_NAME,
+            PRC.TIME_STAMP AS PARENT_TIME_STAMP,
+            b.TIME_STAMP AS CHILD_TIMESTAMP,
+            PG.ERNCD_REG_HRS,
+            nvl(CPJC.T2_PE_CP_FLAG,'N') as T2_PE_CP_FLAG,
+			nvl(CPJC.T2_PE_JC_FLAG,'N') as T2_PE_JC_FLAG,            
+            NVL(css.Component_value, 'N') leave_request,
+            cmp.descr as COMP_DESCR,
+            b.SEQ_NBR
+            FROM PS_T2_PE_SUB_PRCS b
+            INNER JOIN PS_PAYGROUP_TBL PG ON PG.COMPANY = b.COMPANY
+                   AND PG.PAYGROUP = b.PAYGROUP
+                    AND PG.EFFDT =(SELECT MAX(PG_ED.EFFDT) FROM PS_PAYGROUP_TBL PG_ED
+                            WHERE PG.COMPANY = PG_ED.COMPANY
+                              AND PG.PAYGROUP = PG_ED.PAYGROUP
+                              AND PG_ED.EFFDT &lt;= b.PAY_END_DT)
+         	LEFT OUTER JOIN PS_T2_PE_PAYGRP_VW CPJC
+	            ON b.COMPANY = CPJC.COMPANY
+	            AND b.PAYGROUP = CPJC.PAYGROUP
+	            AND CPJC.PAY_END_DT = b.PAY_END_DT
+	            AND CPJC.EFF_STATUS = 'A'                              
+            INNER JOIN psxlatitem a1
+                    ON A1.FIELDNAME ='T2_PE_STATUS'
+                    AND A1.FIELDVALUE = b.T2_PE_STATUS
+            LEFT OUTER JOIN PS_PERSON_NAME N1 ON b.OPRID = N1.EMPLID
+            LEFT OUTER JOIN PS_T2_ENG_METRICS MTX
+                    ON b.COMPANY = MTX.COMPANY
+                    AND b.PAYGROUP = MTX.PAYGROUP
+                    AND b.PAY_END_DT = MTX.PAY_END_DT
+                    AND b.T2_PAYROLL_NUM = MTX.T2_PAYROLL_NUM
+            LEFT OUTER JOIN PS_T2_PE_SPCL_ADDR H
+                    ON b.COMPANY = H.COMPANY
+                    AND b.PAYGROUP = H.PAYGROUP
+                    AND b.PAY_END_DT = H.PAY_END_DT
+                    AND b.OFF_CYCLE = H.OFF_CYCLE
+                    AND b.T2_HRP_PAYROLL_NUM = H.T2_HRP_PAYROLL_NUM
+            LEFT OUTER JOIN(SELECT * FROM PS_LOCATION_TBL d WHERE d.effdt =
+                    (SELECT MAX(s1.EFFDT) from PS_LOCATION_TBL s1 WHERE s1.location = d.location AND S1.EFF_STATUS ='A')) d
+                    ON b.LOCATION= d.LOCATION
+                    AND d.eff_status ='A'
+            LEFT OUTER JOIN(SELECT * FROM PS_DEPT_TBL d1 WHERE
+                    d1.effdt =
+                    (SELECT MAX(s1.EFFDT) FROM PS_DEPT_TBL s1 WHERE s1.deptid = d1.deptid AND S1.EFF_STATUS ='A')) d1
+                    ON b.DEPTID = d1.DEPTID
+                    AND d1.eff_status ='A'
+			LEFT OUTER JOIN component_setup_steps@hpdb_hrdb css
+                    ON b.COMPANY = css.orgid
+                    AND sysdate BETWEEN css.effdt AND css.ENDDT
+                    AND css.component_name ='LEAVE_REQUEST'
+			INNER JOIN PS_COMPANY_TBL D
+	           		ON b.COMPANY = D.COMPANY
+	        		AND D.EFFDT = (select MAX(c1.EFFDT)
+                                FROM ps_company_tbl c1
+                                WHERE c1.company = D.company)
+            ,PS_T2_PE_PROCESS PRC INNER JOIN psxlatitem a2
+                    ON A2.FIELDNAME ='T2_PE_STATUS'
+                    AND A2.FIELDVALUE = prc.T2_PE_STATUS
+            LEFT OUTER JOIN PS_PERSON_NAME N ON PRC.OPRID = N.EMPLID
+            , PS_COMPANY_TBL cmp
+            WHERE b.OFF_CYCLE = :offCycle
+            and  b.T2_PE_STATUS != 'D'
+            AND b.company = :company
+            AND (:status is null OR b.T2_PE_STATUS = :status)
+            AND (:startDate is null OR TO_CHAR(b.PAY_END_DT, 'YYYY-MM-DD') &gt;= :startDate)
+            AND (:endDate is null OR TO_CHAR(b.PAY_END_DT, 'YYYY-MM-DD') &lt;= :endDate)
+            AND cmp.EFFDT = (SELECT MAX(c1.EFFDT) FROM PS_COMPANY_TBL c1
+                            WHERE cmp.COMPANY = c1.COMPANY
+                            and c1.EFF_STATUS = 'A')
+            AND b.company = cmp.COMPANY
+            AND b.COMPANY = PRC.COMPANY
+            AND b.PAYGROUP = PRC.PAYGROUP
+            AND b.PAY_END_DT = PRC.PAY_END_DT
+            AND B.OFF_CYCLE = PRC.OFF_CYCLE
+            AND b.T2_PAYROLL_NUM = PRC.T2_PAYROLL_NUM
+            AND b.T2_HRP_PAYROLL_NUM = PRC.T2_HRP_PAYROLL_NUM
+            AND (MTX.T2_SEQ_NUM IS NULL
+					OR MTX.T2_SEQ_NUM = (SELECT MAX(T2_SEQ_NUM) FROM PS_T2_ENG_METRICS C1
+                                       WHERE C1.COMPANY = MTX.COMPANY
+                                         AND C1.PAYGROUP = MTX.PAYGROUP
+                                         AND C1.PAY_END_DT = MTX.PAY_END_DT
+                                         AND C1.T2_PAYROLL_NUM = MTX.T2_PAYROLL_NUM))
+			AND (css.uniqueid IS NULL
+					OR css.uniqueid = (SELECT MAX(css1.uniqueid) FROM component_setup_steps@hpdb_hrdb css1
+                                        WHERE css.orgid = css1.orgid
+                                        	AND css.component_name = css1.component_name
+                                        	AND css1.enddt &gt;= sysdate))
+            order by PAYGROUP, PAY_END_DT, T2_HRP_PAYROLL_NUM) DAT
+    </sql-query>
+
+    <sql-query name="SQL.paytimereport.payroll.getPayrollAuditLog">
+           select
+                A.COMPANY,
+                A.PAYGROUP,
+                A.PAY_END_DT,
+                A.LOCATION,
+                A.DEPTID,
+                A.PAY_FREQUENCY,
+                A.T2_PE_STATUS,
+                A.OPRID,
+                A.TIME_STAMP,
+                B.DESCR as COMP_DESC,
+                C.XLATLONGNAME as T2_PE_STAT_DESCR,
+                A.CHECK_DT
+                FROM PS_AUDIT_T2_PE_PRC A
+                INNER JOIN PS_COMPANY_TBL B
+                    ON B.COMPANY = A.COMPANY
+                    AND B.EFFDT = (select max(c1.EFFDT)
+                                from ps_company_tbl c1
+                                WHERE c1.company = B.company)
+                INNER JOIN PSXLATITEM C
+                    ON C.FIELDNAME = 'T2_PE_STATUS'
+                    AND C.FIELDVALUE = A.T2_PE_STATUS
+            WHERE
+                    A.company = :company
+                    AND A.OFF_CYCLE = :offCycle
+                    AND A.PAYGROUP = :payGroup
+                    AND case when :offCycle = 'N' then A.PAY_END_DT else A.CHECK_DT end = :payEndDate
+                    AND audit_actn in ('A','N')
+                    ORDER BY A.TIME_STAMP DESC
+
+    </sql-query>
+    <sql-query name="SQL.payroll.process.getPayrollDeadlineTime">
+         SELECT CASE C.COUNTRY
+                  WHEN 'USA'
+                  THEN TO_CHAR(D.T2_WEB_TIME_DEADLN, 'HH12:MI AM')
+                  ELSE TO_CHAR(D.T2_WEB_TIME_CAN, 'HH12:MI AM')
+              END AS WEB_DEADLINE,
+         CASE C.COUNTRY
+              WHEN 'USA'
+              THEN TO_CHAR(D.T2_WEB_OFF_US_DDLN, 'HH12:MI:SS AM')
+              ELSE TO_CHAR(D.T2_WEB_OFF_CN_DDLN, 'HH12:MI:SS AM')
+          END AS OFFCYCLE_WEB_DEADLINE,
+              A.T2_TIME_ZONE,
+              X.XLATLONGNAME
+              FROM PS_T2_CLIENTOPTION A,
+                PS_T2_PE_PEO_CNTRY B,
+                PS_T2_PE_BLACKOUT C,
+                PS_T2_ENG_SETTINGS D,
+                PSXLATITEM X
+              WHERE A.COMPANY          = :company
+              AND B.PF_CORP            = A.PF_CORP
+              AND C.ON_OR_OFF          = 'ON'
+              AND C.T2_PEO_ID =
+                CASE A.T2_PEO_ID
+                  WHEN ' '
+                  THEN 'PAS'
+                  ELSE A.T2_PEO_ID
+                END
+              AND C.COUNTRY = B.COUNTRY
+         and X.FIELDNAME = 'T2_TIME_ZONE'
+                and X.FIELDVALUE = A.T2_TIME_ZONE
+                and X.EFFDT = (SELECT max(X1.EFFDT) FROM PSXLATITEM X1
+                                where X1.FIELDNAME = X.FIELDNAME
+                                and X1.FIELDVALUE = X.FIELDVALUE
+                                and X1.EFFDT &lt;= sysdate)
+                and X.EFF_STATUS = 'A'
+    </sql-query>
+    <sql-query name="SQL.payroll.updatePeProcessCheckDt">
+        update ps_t2_pe_process
+         set check_dt = :checkDt,
+         oprid = :oprId ,
+         time_stamp = SYSDATE
+         where seq_nbr = :id
+    </sql-query>
+    <sql-query name="SQL.payroll.prview.getCompanyConverstionRate">
+       select C.COUNTRY,
+            CASE C.COUNTRY
+              WHEN 'CAN'
+              THEN A.RATE_MULT
+              ELSE 1
+            END AS RATE_MULT,
+            E.COMPANY
+            FROM PS_T2_PE_PROCESS D
+                LEFT OUTER JOIN PS_RT_RATE_TBL a
+                  ON a.RT_RATE_INDEX = 'PAY2BILL'
+                  AND a.FROM_CUR = 'CAD'
+                  AND a.TO_CUR = 'USD'
+                  AND a.RT_TYPE = 'DAILY'
+                  AND a.TERM = 0
+                      LEFT OUTER JOIN PS_T2_CLIENTOPTION B
+                  ON B.company = D.COMPANY
+                      LEFT OUTER JOIN PS_T2_PE_PEO_CNTRY C
+                  ON C.PF_CORP = B.PF_CORP
+                LEFT OUTER JOIN PS_PF_SPCL_INV_COM E
+                  ON E.company = D.COMPANY
+                  AND E.RT_RATE_INDEX = 'PAY2BILL'
+                LEFT OUTER JOIN PS_T2_PAYROLL_HDR F
+                	ON F.COMPANY = D.COMPANY
+                	AND F.PAYGROUP = D.PAYGROUP
+                	AND F.PAY_END_DT = D.PAY_END_DT
+                	AND F.OFF_CYCLE = D.OFF_CYCLE
+                	AND F.T2_PAYROLL_NUM = D.T2_PAYROLL_NUM
+              WHERE D.COMPANY = :company
+                    AND D.PAYGROUP = :payGroup
+                    AND D.PAY_END_DT = :payEndDate
+                    AND D.OFF_CYCLE = :offCycle
+                    AND D.T2_HRP_PAYROLL_NUM = :payrollNumber
+                AND A.EFFDT = (SELECT MAX(A_ED.EFFDT)
+                        FROM PS_RT_RATE_TBL A_ED
+                        WHERE A.RT_RATE_INDEX = A_ED.RT_RATE_INDEX
+                          AND A.TERM = A_ED.TERM
+                          AND A.FROM_CUR = A_ED.FROM_CUR
+                          AND A.TO_CUR = A_ED.TO_CUR
+                          AND A.RT_TYPE = A_ED.RT_TYPE
+                          AND A_ED.EFFDT &lt;= (CASE D.T2_PE_STATUS WHEN 'F' THEN F.PF_INVOICE_DT ELSE SYSDATE END))
+    </sql-query>
+  <!-- Payroll Process SQL Queries end -->
+  <!-- Payroll Data Import SQL Queries Start -->
+  <sql-query  name="SQL.payroll.dataimport.getCompanyDepartments">
+        SELECT A.DEPTID,A.DESCR
+  FROM PS_DEPT_TBL A, PS_T2_CLIENTOPTION B, PS_T2_PE_PEO_CNTRY C WHERE
+  A.COMPANY = :company
+  AND A.EFF_STATUS = 'A' AND
+  A.EFFDT =
+        (SELECT MAX(A_ED.EFFDT) FROM PS_DEPT_TBL A_ED
+        WHERE A.SETID = A_ED.SETID
+          AND A.DEPTID = A_ED.DEPTID
+          AND A_ED.EFFDT &lt;= SYSDATE)
+  AND A.COMPANY = B.COMPANY
+  AND B.T2_COMP_TERM_DT IS NULL
+  AND B.PF_CORP = C.PF_CORP
+
+  </sql-query>
+  <sql-query name="SQL.payroll.dataimport.getEmployeeStatusAndType">
+     SELECT EMPLID, EMPL_STATUS, STATUS, EMPL_TYPE, EFFDT , DEPTID
+          FROM PS_T2_PE_EMPALL_VW
+          WHERE COMPANY  = :company
+          	AND PAYGROUP = :payGroup
+          	AND OFF_CYCLE = :offCycle
+          	AND T2_HRP_PAYROLL_NUM = :payrollNumber
+          	AND PAY_END_DT = :payEndDate
+  </sql-query>
+  <sql-query name="SQL.payroll.dataimport.getEmployeeI9Status">
+    SELECT DAT.EMPLID,
+       CASE
+          WHEN PEO.COUNTRY = 'USA'
+          THEN DAT.US_WORK_ELIGIBILTY
+          ELSE 'Y'
+        END
+      FROM PS_T2_PE_UPLD_STG STG,
+        PS_PERS_DATA_USA DAT,
+        PS_T2_CLIENTOPTION CLNT ,
+        PS_T2_PE_PEO_CNTRY PEO
+      WHERE STG.EMPLID           = DAT.EMPLID
+      AND STG.COMPANY            = :company
+      AND STG.PAYGROUP           = :payGroup
+      AND STG.PAY_END_DT         = :payEndDate
+      AND STG.OFF_CYCLE          = :offCycle
+      AND STG.T2_HRP_PAYROLL_NUM = :payrollNumber
+      AND STG.T2_PE_PROFILE_ID   = :profileId
+      AND STG.T2_PE_SOURCE       = :source
+      AND STG.COMPANY            = CLNT.COMPANY
+      AND CLNT.T2_COMP_TERM_DT IS NULL
+      AND PEO.PF_CORP            = CLNT.PF_CORP
+      AND DAT.EFFDT              =
+        (SELECT MAX(DAT1.EFFDT)
+        FROM PS_PERS_DATA_USA DAT1
+        WHERE DAT1.EMPLID = DAT.EMPLID
+        AND DAT1.EFFDT   &lt;= SYSDATE
+        )
+  </sql-query>
+  <sql-query name="SQL.payroll.dataimport.deleteStagingRecords">
+    DELETE FROM PS_T2_PE_UPLD_STG STG
+        WHERE STG.COMPANY          = :company
+        AND STG.PAYGROUP           = :payGroup
+        AND STG.PAY_END_DT         = :payEndDate
+        AND STG.OFF_CYCLE          = :offCycle
+        AND STG.T2_HRP_PAYROLL_NUM = :payrollNumber
+        AND STG.T2_PE_PROFILE_ID   = :profileId
+        AND STG.T2_PE_SOURCE       = :source
+  </sql-query>
+
+  <sql-query name="SQL.payroll.dataimport.deleteStagingRecordsByPaygroup">
+    DELETE FROM PS_T2_PE_UPLD_STG STG
+        WHERE STG.COMPANY          = :company
+        AND STG.PAYGROUP           = :payGroup
+        AND STG.PAY_END_DT         = :payEndDate
+        AND STG.OFF_CYCLE          = :offCycle
+        AND STG.T2_HRP_PAYROLL_NUM = :payrollNumber
+        AND STG.T2_PE_SOURCE       = :source
+  </sql-query>
+
+  <sql-query name="SQL.payroll.dataimport.findEmployeeIDNameMap">
+    SELECT DISTINCT P.EMPLID, P.NAME_PSFORMAT FROM PS_PERSON_NAME P
+      INNER JOIN PS_T2_PE_PYRL_EMP R
+      ON P.EMPLID                = R.EMPLID
+      WHERE R.COMPANY            = :company
+        AND R.PAYGROUP           = :payGroup
+        AND R.PAY_END_DT         = :payEndDate
+        AND R.OFF_CYCLE          = :offCycle
+        AND R.T2_HRP_PAYROLL_NUM = :payrollNumber
+  </sql-query>
+  <sql-query name="SQL.payroll.dataimport.findAlternateEmployeeIDMap">
+    SELECT P.EMPLID, P.ALTER_EMPLID FROM PS_PERSONAL_DATA P
+        INNER JOIN PS_T2_PE_PYRL_EMP R
+        ON P.EMPLID              = R.EMPLID
+        WHERE R.COMPANY          = :company
+        AND R.PAYGROUP           = :payGroup
+        AND R.PAY_END_DT         = :payEndDate
+        AND R.OFF_CYCLE          = :offCycle
+        AND R.T2_HRP_PAYROLL_NUM = :payrollNumber
+  </sql-query>
+  <!-- Payroll Data Import SQL Queries End -->
+  <!-- Payroll Data Import Profile SQL Queries Start -->
+  <sql-query name="SQL.payroll.dataimportprofile.deleteProfileByProfileId">
+    DELETE FROM PS_T2_PE_PROFILE WHERE T2_PE_PROFILE_ID = :profileId
+  </sql-query>
+  <sql-query name="SQL.payroll.dataimportprofile.field.deleteFieldsByProfileId">
+    DELETE FROM PS_T2_PE_LAYOUT WHERE T2_PE_PROFILE_ID = :profileId
+  </sql-query>
+  <sql-query name="SQL.payroll.dataimportprofile.field.deleteMappingsByProfileId">
+    DELETE FROM PS_T2_PE_CODE_MAP WHERE T2_PE_PROFILE_ID = :profileId
+   </sql-query>
+  <!--  Payroll Data Import Profile SQL Queries Start -->
+  <!-- Payroll MidPay SQL Queries Start -->
+  <sql-query name="SQL.payroll.midpay.checkForMidPayEvent">
+      SELECT  DISTINCT A.EMPLID
+          FROM ps_t2_pe_emp_hold A
+        WHERE     A.audit_actn IN ('A', 'N')
+               AND A.COMPANY = :company
+               AND A.PAYGROUP = :payGroup
+               AND A.EFFDT &gt; :payBeginDate
+               AND A.EFFDT &lt;= :payEndDate
+               AND A.T2_PROCESS_ACTIONS IN ('N', ' ')
+               AND A.AUDIT_STAMP =
+                      (SELECT MAX (A_ED.AUDIT_STAMP)
+                         FROM ps_t2_pe_emp_hold A_ED
+                        WHERE      A_ED.EMPLID = A.EMPLID
+                              AND A_ED.EMPL_RCD = A.EMPL_RCD
+                              AND A_ED.EFFDT = A.EFFDT
+                              AND A_ED.EFFSEQ = A.EFFSEQ
+                              AND A_ED.COMPANY = A.COMPANY
+                              AND A_ED.PAYGROUP = A.PAYGROUP
+                              AND A_ED.ACTION = A.ACTION)
+      <!-- SELECT DISTINCT A.EMPLID FROM PS_T2_ACTIONS_HOLD A
+         WHERE A.COMPANY  = :company
+           AND A.PAYGROUP = :payGroup
+           AND A.EFFDT    &gt; :payBeginDate
+           AND A.EFFDT   &lt;= :payEndDate
+           AND A.T2_PROCESS_ACTIONS IN ('N',' ') -->
+  </sql-query>
+  <!-- Payroll MidPay SQL Queries End -->
+
+  <!-- Offcycle file import Queries start -->
+
+   <sql-query name="SQL.payroll.offcycle.emplIdEmplNameMap">
+      SELECT DISTINCT P.EMPLID, P.NAME_PSFORMAT
+        FROM PS_PERSON_NAME P INNER JOIN PS_T2_PE_EMPOFF_VW R
+            ON P.EMPLID = R.EMPLID
+             WHERE R.COMPANY = :company
+             AND R.PAYGROUP = :paygroup
+  </sql-query>
+
+  <sql-query name="SQL.payroll.offcycle.emplIdAlterEmplIdMap">
+      SELECT DISTINCT P.EMPLID, P.ALTER_EMPLID
+        FROM PS_PERSONAL_DATA P INNER JOIN PS_T2_PE_EMPOFF_VW R
+            ON P.EMPLID = R.EMPLID
+             WHERE R.COMPANY = :company
+             AND R.PAYGROUP = :paygroup
+  </sql-query>
+  <!-- Offcycle file import Queries End-->
+
+  <sql-query name="SQL.payroll.getReportedEarncodes">
+        SELECT DISTINCT a.erncd
+         FROM PS_T2_PE_PYRL_RPTD a
+        WHERE A.company = :company
+            AND A.paygroup = :payGroup
+            AND A.PAY_END_DT = :payEndDate
+            AND A.off_cycle =:offCycle
+            AND A.t2_hrp_payroll_num = :payrollNumber
+            AND (a.HOURS_EARNED != 0
+                OR a.T2_PE_AMOUNT != 0
+                OR a.T2_PE_UNITS != 0 )
+
+  </sql-query>
+
+  <sql-query name="SQL.delete.reported.earncodeRecords">
+        DELETE FROM PS_T2_PE_PYRL_RPTD a where
+            A.company = :company
+            AND A.paygroup = :payGroup
+            AND A.PAY_END_DT = :payEndDate
+            AND A.off_cycle =:offCycle
+            AND A.t2_hrp_payroll_num = :payrollNumber
+            AND A.erncd IN (:earnCodes)
+  </sql-query>
+
+  <sql-query name="SQL.update.date.operId.pe.process">
+        update ps_t2_pe_process
+           SET OPRID = :operatorId,
+            TIME_STAMP = SYSDATE
+        where seq_nbr = :id
+  </sql-query>
+   <sql-query name="SQL.GET.SPECIAL_PAYROLL_CREATED_USR">
+        select 1 from  PS_AUDIT_T2_PE_PST c
+        where c.seq_nbr= :id
+        and c.OPRID = :operatorId
+        and audit_actn = 'A'
+  </sql-query>
+  <sql-query name="SQL.GET.SPECIAL_PAYROLL_UPDATED_USRS">
+    select 1 from  PS_AUDIT_T2_PE_PST c
+        where c.seq_nbr= :id
+            and c.OPRID != :operatorId
+
+  </sql-query>
+    <sql-query name="SQL.timesheetPayroll.findCompanySortApprovalConfig">
+SELECT AD.SORTIDORDER,
+       CASE
+          WHEN AD.SORTIDORDER = '1'
+          THEN
+             'Sort by Employee'
+          WHEN AD.SORTIDORDER = '3;1'
+          THEN
+             'Sort by Location, Employee'
+          WHEN AD.SORTIDORDER = '2;1'
+          THEN
+             'Sort by Department, Employee'
+          WHEN AD.SORTIDORDER = '3;2;1'
+          THEN
+             'Sort by Location, Department, Employee'
+          WHEN AD.SORTIDORDER = '2;3;1'
+          THEN
+             'Sort by Department, Location, Employee'
+       END
+          AS SORTID_DESC,
+       AD.RESTRICTED_ELIG,
+       CASE
+          WHEN AD.RESTRICTED_ELIG = '1' THEN 'Approve by Company'
+         WHEN AD.RESTRICTED_ELIG = '2' THEN 'Approve by Department, Company'
+          WHEN AD.RESTRICTED_ELIG = '3' THEN 'Approve by Location, Company'
+       END
+          AS RESTRICT_DESC,
+       AD.ORG_DESC
+  FROM (SELECT DISTINCT
+               CR.RESTRICTED_ELIG,
+               LISTAGG (srt.sort_id, ';')
+                  WITHIN GROUP (ORDER BY srt.T2_PE_SORT_SEQ)
+                  OVER (PARTITION BY srt.company)
+                  AS SORTIDORDER,
+                  A.ORG_DESC
+          FROM    ORGS@HPDB_HRDB A LEFT OUTER JOIN PS_T2_PE_CMP_SORT srt ON SRT.COMPANY = a.orgid
+               LEFT OUTER JOIN
+                  PS_T2_PE_CMP_REST CR
+               ON srt.COMPANY = CR.COMPANY
+         WHERE     (srt.effdt is null or srt.effdt = (SELECT MAX (s1.EFFDT)
+                                  FROM PS_T2_PE_CMP_SORT s1
+                                 WHERE s1.company = srt.company))
+               and a.orgid = :company
+               AND SYSDATE BETWEEN A.EFFDT AND A.ENDDT) AD
+</sql-query>
+
+  <sql-query name="SQL.timesheetPayroll.findCompanyEffectiveSortApprovalConfig">
+     SELECT AD.SORTIDORDER,
+    case when AD.SORTIDORDER ='1' then 'Sort by Employee'
+    when AD.SORTIDORDER ='3;1' then 'Sort by Location, Employee'
+    when AD.SORTIDORDER ='2;1' then 'Sort by Department, Employee'
+    when AD.SORTIDORDER ='3;2;1' then 'Sort by Location, Department, Employee'
+    when AD.SORTIDORDER ='2;3;1' then 'Sort by Department, Location,
+    Employee' end as SORTID_DESC,
+    AD.RESTRICTED_ELIG,
+    case when AD.RESTRICTED_ELIG ='1' then 'Approve by Company'
+    when AD.RESTRICTED_ELIG ='2' then 'Approve by Department, Company'
+    when AD.RESTRICTED_ELIG ='3' then 'Approve by Location, Company' end as
+    RESTRICT_DESC
+    from(SELECT distinct CR.RESTRICTED_ELIG, LISTAGG(srt.sort_id, ';') WITHIN GROUP
+    (ORDER BY srt.T2_PE_SORT_SEQ) OVER (PARTITION BY srt.company) AS
+    SORTIDORDER
+    from PS_T2_PE_CMP_SORT srt LEFT OUTER JOIN PS_T2_PE_CMP_REST CR
+    ON srt.COMPANY = CR.COMPANY where srt.effdt =
+    (Select MAX(s1.EFFDT) from PS_T2_PE_CMP_SORT s1 where s1.company = srt.company AND s1.effdt &lt;= (SELECT MAX (PRC.PAY_BEGIN_DT)
+                                           FROM PS_T2_PE_PROCESS PRC WHERE PRC.company = s1.company)
+    )
+    and srt.COMPANY = :company) AD
+</sql-query>
+
+   <sql-query name="SQL.payroll.company.isLeaveRequest">
+        select a.Component_value leave_request
+            from component_setup_steps@hpdb_hrdb a
+        WHERE a.orgid = :company
+        and a.component_name = 'LEAVE_REQUEST'
+    </sql-query>
+
+    <sql-query name="SQL.payroll.data.payroll.UpdateStatusSubProcess">
+       update PS_T2_PE_SUB_PRCS
+            set T2_PE_STATUS = :status,
+            OPRID = :operatorId,
+            TIME_STAMP = SYSDATE
+        where company = :company
+            and PAYGROUP = :payGroup
+            AND OFF_CYCLE = :offCycle
+            AND T2_HRP_PAYROLL_NUM = :payrollNumber
+            AND PAY_END_DT = :payEndDate
+            and SEQ_NBR = :id
+    </sql-query>
+
+    <sql-query name="SQL.payroll.data.payroll.UpdateStatusSubProcessFromProcess">
+       UPDATE PS_T2_PE_SUB_PRCS
+        SET T2_PE_STATUS = (select T2_PE_STATUS  from  ps_t2_pe_process where company = :company
+                                        AND PAYGROUP = :payGroup
+                                        AND PAY_END_DT = :payEndDate
+                                        AND OFF_CYCLE = :offCycle
+                                        AND T2_HRP_PAYROLL_NUM = :payrollNumber
+                                        ),
+        OPRID = :operatorId,
+        TIME_STAMP = sysdate
+        WHERE COMPANY = :company
+        AND PAYGROUP = :payGroup
+        AND PAY_END_DT = :payEndDate
+        AND OFF_CYCLE = :offCycle
+        AND T2_HRP_PAYROLL_NUM = :payrollNumber
+    </sql-query>
+
+    <sql-query name="SQL.payroll.data.payroll.Is401KAmbroseClient">
+    	SELECT COUNT (*) AS GOT_BEN_VEN_ID
+		  FROM PS_BENEF_PLAN_TBL BP
+		 WHERE     BP.PLAN_TYPE = '4Q'
+		       AND BP.BENEFIT_PLAN IN
+		              (SELECT BO.BENEFIT_PLAN
+		                 FROM PS_BEN_DEFN_OPTN BO
+		                WHERE     BO.BENEFIT_PROGRAM IN
+		                             (SELECT O.BENEFIT_PROGRAM
+		                                FROM PS_T2_CLIENT_OPTN2 O
+		                               WHERE     O.COMPANY = :company
+		                                     AND EFF_STATUS = 'A'
+		                                     AND O.EFFDT =
+		                                            (SELECT MAX (O_ED.EFFDT)
+		                                               FROM PS_T2_CLIENT_OPTN2 O_ED
+		                                              WHERE     O.COMPANY =
+		                                                           O_ED.COMPANY
+		                                                    AND O.PF_CLIENT =
+		                                                           O_ED.PF_CLIENT
+		                                                    AND O_ED.EFFDT &lt;= SYSDATE))
+		                      AND BO.EFFDT =
+		                             (SELECT MAX (B.EFFDT)
+		                                FROM PS_BEN_DEFN_OPTN B
+		                               WHERE     BO.BENEFIT_PROGRAM =
+		                                            B.BENEFIT_PROGRAM
+		                                     AND B.EFFDT &lt;= SYSDATE)
+		                      AND BO.PLAN_TYPE = '4Q'
+		                      AND BO.OPTION_TYPE = 'O'
+		                      AND BO.ELIG_RULES_ID &lt;&gt; '2009')
+		       AND BP.EFFDT =
+		              (SELECT MAX (BP_ED.EFFDT)
+		                 FROM PS_BENEF_PLAN_TBL BP_ED
+		                WHERE     BP.BENEFIT_PLAN = BP_ED.BENEFIT_PLAN
+		                      AND BP.PLAN_TYPE = BP_ED.PLAN_TYPE
+		                      AND BP_ED.EFFDT &lt;= SYSDATE)
+		       AND BP.VENDOR_ID = 'MASSMU'
+    </sql-query>
+    <sql-query name="SQL.payroll.activeEarncodesByCompany">
+    	select distinct erncd from PS_T2_PE_PYRL_RPTD a, ps_t2_pe_process b
+		where a.company=b.company  and a.off_cycle=b.off_cycle
+			and a.paygroup=b.paygroup and a.pay_end_dt=B.PAY_END_DT
+ 			and a.t2_hrp_payroll_num = b.T2_HRP_PAYROLL_NUM
+            AND (a.HOURS_EARNED != 0
+                OR a.T2_PE_AMOUNT != 0
+                OR a.T2_PE_UNITS != 0 ) and
+		b.company= :company and b.off_cycle='N' and b.T2_PE_STATUS != 'F'
+    </sql-query>
+
+    <sql-query name="SQL.payroll.data.oncycle.EmployeesByDeptLoc">
+        SELECT EMPLID, EMPL_RCD,
+            DEPTID, DESCR, JOBCODE, LOCATION, DESCR1,
+            LAST_NAME, FIRST_NAME, MIDDLE_NAME,
+            EMPL_STATUS, T2_EMPL_STS_DESCR,
+            REG_TEMP, FULL_PART_TIME, EMPL_TYPE,
+            EMPL_CLASS, HIRE_DT, TERMINATION_DT,
+            LAST_DATE_WORKED, US_WORK_ELIGIBILTY
+        FROM PS_T2_PE_EMPON_VW WHERE
+        COMPANY = :company
+        and PAYGROUP = :payGroup
+        AND PAY_END_DT = :payEndDate
+        AND OFF_CYCLE = :offCycle
+        AND T2_HRP_PAYROLL_NUM = :payrollNumber
+        AND DEPTID like :deptId
+        AND LOCATION like :location
+    </sql-query>
+
+    <sql-query name="SQL.payroll.retroPayCheck">
+		SELECT COUNT(*) FROM PS_PAY_OTH_EARNS OT
+			WHERE OT.COMPANY = :company
+			AND OT.PAYGROUP = :payGroup
+			AND OT.PAY_END_DT = :payEndDate
+			AND OFF_CYCLE = 'N'
+			AND OT.ERNCD IN (SELECT RX.ERNCD_FOR_RETROPAY FROM PS_T2_PE_RETROXLAT RX, PS_T2_PE_RETROXLA1 R1, PS_PAYGROUP_TBL PG
+            	WHERE PG.COMPANY = :company
+            	AND PG.PAYGROUP = :payGroup
+            	AND PG.EFFDT = (SELECT MAX(PG_ED.EFFDT) FROM PS_PAYGROUP_TBL PG_ED
+		            WHERE PG_ED.COMPANY = PG.COMPANY
+		            AND PG_ED.PAYGROUP = PG.PAYGROUP AND PG_ED.EFF_STATUS = 'A'
+		            AND PG_ED.EFFDT &lt;= :payEndDate)
+            	AND R1.ERN_PROGRAM = PG.ERN_PROGRAM
+            	AND R1.EFFDT = (SELECT MAX(R1_ED.EFFDT) FROM PS_T2_PE_RETROXLA1 R1_ED
+		            WHERE R1.ERN_PROGRAM = R1_ED.ERN_PROGRAM AND R1_ED.EFF_STATUS = 'A'
+		            AND R1_ED.EFFDT &lt;= :payEndDate)
+            	AND RX.ERN_PROGRAM = R1.ERN_PROGRAM
+				AND RX.EFFDT = R1.EFFDT)
+    </sql-query>
+
+    <sql-query name="SQL.payroll.checkPayrollBlackout">
+		SELECT COUNT(*) AS COUNT FROM PS_T2_PAYBLKOUT_VW P
+         WHERE P.COMPANY = :company
+           AND P.PAYGROUP = :payGroup
+           AND P.PAY_END_DT = :payEndDate
+           AND P.OFF_CYCLE = :offCycle
+           AND P.T2_PAYROLL_NUM = :payrollNumber
+    </sql-query>
+    <sql-query name="SQL.payroll.preview.flsa.count">
+	    SELECT count(distinct P.EMPLID)
+	  		FROM PS_T2_PE_PYRL_EMP E
+	  	INNER JOIN PS_PAYGROUP_TBL PG
+		    ON PG.COMPANY = E.COMPANY
+		    AND PG.PAYGROUP = E.PAYGROUP
+		    AND PG.FLSA_REQUIRED = 'Y'
+	  	INNER JOIN PS_PAY_EARNINGS P
+		    ON P.COMPANY = E.COMPANY
+		    AND P.PAYGROUP = E.PAYGROUP
+		    AND P.PAY_END_DT = E.PAY_END_DT
+		    AND P.OFF_CYCLE = E.OFF_CYCLE
+		    AND P.EMPLID = E.EMPLID
+		    AND P.EMPL_RCD = E.EMPL_RCD
+		    AND P.rate_used = 'F'
+		    and P.HOURLY_RT &lt;&gt; P.FLSA_RT
+		  WHERE E.COMPANY = :company
+		  AND E.PAYGROUP = :payGroup
+		  AND E.PAY_END_DT = :payEndDate
+		  AND E.OFF_CYCLE = :offCycle
+		  AND E.T2_HRP_PAYROLL_NUM = :payrollNumber
+		  AND PG.EFFDT = (SELECT MAX(PG_ED.EFFDT) FROM PS_PAYGROUP_TBL PG_ED
+				            WHERE PG_ED.COMPANY = PG.COMPANY
+				            AND PG_ED.PAYGROUP = PG.PAYGROUP
+		                AND PG_ED.EFF_STATUS = 'A'
+				            AND PG_ED.EFFDT &lt;= E.PAY_END_DT)
+    </sql-query>
+
+    <sql-query name="SQL.payroll.preview.tip.count">
+	    SELECT count(distinct P.EMPLID)
+	  		FROM PS_T2_PE_PYRL_EMP E
+	  	INNER JOIN PS_COMPANY_TBL C
+		    ON C.COMPANY = E.COMPANY
+		    AND C.TIPS_PROCESSING = 'Y'
+	  	INNER JOIN PS_PAY_EARNINGS P
+		    ON P.COMPANY = E.COMPANY
+		    AND P.PAYGROUP = E.PAYGROUP
+		    AND P.PAY_END_DT = E.PAY_END_DT
+		    AND P.OFF_CYCLE = E.OFF_CYCLE
+		    AND P.EMPLID = E.EMPLID
+		    AND P.EMPL_RCD = E.EMPL_RCD
+		    and P.OT_HRS &lt;&gt; 0
+		  WHERE E.COMPANY = :company
+		  AND E.PAYGROUP = :payGroup
+		  AND E.PAY_END_DT = :payEndDate
+		  AND E.OFF_CYCLE = :offCycle
+		  AND E.T2_HRP_PAYROLL_NUM = :payrollNumber
+		  AND C.EFFDT = (SELECT MAX(C_ED.EFFDT) FROM PS_COMPANY_TBL C_ED
+				            WHERE C_ED.COMPANY = C.COMPANY
+		                AND C_ED.EFF_STATUS = 'A'
+				            AND C_ED.EFFDT &lt;= E.PAY_END_DT)
+    </sql-query>
+
+    <sql-query name="SQL.payroll.process.getCompanyConversionStatus">
+    	select T2_TIME_ATTENDANCE from PS_T2_CLIENTOPTION  where company = :company
+    </sql-query>
+
+    <sql-query name="SQL.payroll.process.verifyProcessTable">
+        select * from ps_t2_pe_process where company = :company
+    </sql-query>
+
+    <sql-query name="SQL.payroll.process.verifyCompany">
+        select * from PS_T2_CLIENTOPTION where company = :company and T2_TIME_ATTENDANCE = 'PSTA'
+    </sql-query>
+
+    <sql-query name="SQL.payroll.data.payroll.getEmployeeMaxRegHours">
+	SELECT I.EMPLID,
+	I.EMPL_RCD,
+	CASE
+	WHEN (J.ACTION = 'TER' OR J.EMPL_STATUS = 'T')
+	THEN
+	0
+	WHEN (J.ACTION = 'LOA' OR J.EMPL_STATUS = 'L')
+	THEN
+	0
+	WHEN (J.EMPL_STATUS = 'U' AND J.COMPRATE = 0)
+	THEN
+	0
+	ELSE
+	( (J.STD_HOURS / 5)
+	* (SELECT COUNT (*) FROM PS_T2_PE_DATES_TBL D
+	WHERE D.THE_DATE BETWEEN I.PAY_BEGIN_DT AND I.PAY_END_DT
+	AND D.DAYOFWEEK NOT IN (1, 7)))
+	END
+	AS MAX_REG_HRS
+	FROM PS_JOB J,
+	(SELECT DISTINCT
+	E.COMPANY,
+	E.PAYGROUP,
+	E.PAY_END_DT,
+	E.OFF_CYCLE,
+	E.EMPLID,
+	E.EMPL_RCD,
+	( SELECT CAL.PAY_BEGIN_DT
+	FROM PS_PAY_CALENDAR CAL
+	WHERE CAL.COMPANY = :i_COMPANY
+	AND CAL.PAYGROUP = :i_PAYGROUP
+	AND CAL.PAY_END_DT = :i_PayEndDt)
+	AS PAY_BEGIN_DT
+	FROM PS_T2_PE_PYRL_EMP E
+	WHERE E.COMPANY = :i_COMPANY
+	AND E.PAYGROUP = :i_PAYGROUP
+	AND E.PAY_END_DT = :i_PayEndDt
+	AND E.OFF_CYCLE = 'N'
+	AND E.T2_HRP_PAYROLL_NUM = 0
+	AND EMPL_TYPE = 'S'
+	ORDER BY E.EMPLID,
+	E.EMPL_RCD) I
+	WHERE J.EFFDT = (SELECT MAX (J_ED.EFFDT) FROM PS_JOB J_ED
+	WHERE J.EMPLID = J_ED.EMPLID
+	AND J.EMPL_RCD = J_ED.EMPL_RCD
+	AND J_ED.EFFDT &lt;= I.PAY_END_DT)
+	AND J.EFFSEQ = (SELECT MAX (J_ES.EFFSEQ) FROM PS_JOB J_ES
+	WHERE J.EMPLID = J_ES.EMPLID
+	AND J.EMPL_RCD = J_ES.EMPL_RCD
+	AND J.EFFDT = J_ES.EFFDT)
+	AND J.EMPLID = I.EMPLID
+	AND J.EMPL_RCD = I.EMPL_RCD
+    </sql-query>
+
+     <sql-query name="SQL.timesheetPayroll.getUniqueEmployeeForPaygroup">
+             SELECT  Distinct RT.EMPLID , RT.COMPANY, RT.PAYGROUP, RT.PAY_END_DT, RT.OFF_CYCLE, RT.T2_HRP_PAYROLL_NUM
+            FROM PS_T2_PE_PYRL_EMP RT
+            WHERE RT.COMPANY =  :company
+            AND RT.PAYGROUP = :payGroup
+            AND RT.PAY_END_DT = :payEndDate
+            AND RT.off_cycle = :offCycle
+            AND RT.t2_HRP_payroll_num = :payrollNumber
+
+    </sql-query>
+
+    <sql-query name="SQL.payroll.security.getUserDeptLocationAccess">
+        SELECT DISTINCT a.DEPTID, a.LOCATION FROM ALLROLES_VW@HPDB_HRDB a
+            WHERE a.ORGID       = :company
+            AND a.PERSONID		= :personId
+            AND a.S_ROLE		= :userRole
+    </sql-query>
+
+</hibernate-mapping>

@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
+
+
+	<bean id="employeeBatchDao" class="com.payroll.dao.impl.EmployeeBatchDaoImpl">
+		<property name="peoplesoft_sessionFactory" ref="peoplesoft_sessionFactory" />
+	</bean>
+	<bean id="employeeBatchService" class="com.payroll.service.impl.EmployeeBatchServiceImpl">
+		<property name="employeeBatchDao" ref="employeeBatchDao" />
+	</bean>
+
+	<bean id="payrollDao" class="com.payroll.dao.impl.PayrollDaoImpl">
+		<property name="peoplesoft_sessionFactory" ref="peoplesoft_sessionFactory" />
+		<property name="hrp_sessionFactory" ref="hrp_sessionFactory" />
+	</bean>
+
+	<bean id="payrollEntryDao" class="com.payroll.dao.impl.PayrollEntryDaoImpl">
+		<property name="peoplesoft_sessionFactory" ref="peoplesoft_sessionFactory" />
+	</bean>
+	<bean id="payrollProcessDao" class="com.payroll.dao.impl.PayrollProcessDaoImpl">
+		<property name="peoplesoft_sessionFactory" ref="peoplesoft_sessionFactory" />
+		<property name="hrp_sessionFactory" ref="hrp_sessionFactory" />
+		<property name="spPayrollReInitialize" ref="spPayrollReInitialize" />
+		<property name="spDeleteFromRsn1Table" ref="spDeleteFromRsn1Table" />
+		</bean>
+		
+		<bean id="payrollDataEntryDao" class="com.payroll.dao.impl.PayrollDataEntryDaoImpl">
+		<property name="peoplesoft_sessionFactory" ref="peoplesoft_sessionFactory" />
+		</bean>
+		
+		<bean id="psNamesSecurityDao" class="com.payroll.dao.impl.PsNamesSecurityDaoImpl">
+		<property name="peoplesoft_sessionFactory" ref="peoplesoft_sessionFactory" />
+		</bean>
+	<bean id="payrollDataAccessDao" class="com.payroll.dao.impl.PayrollDataAccessDaoImpl">
+		<property name="peoplesoft_sessionFactory" ref="peoplesoft_sessionFactory" />
+		<property name="spEmployeesLeaveAccrual" ref="spEmployeesLeaveAccrual" />
+		</bean>
+		
+		
+		<bean id="payrollStagingDao" class="com.payroll.dao.impl.PayrollStagingDaoImpl">
+		<property name="peoplesoft_sessionFactory" ref="peoplesoft_sessionFactory" />
+		<property name="payrollStagingPublishSP" ref="payrollStagingPublishSP" />
+		</bean>
+	
+		
+	<bean id="payrollService" class="com.payroll.service.impl.PayrollServiceImpl">
+		<property name="payrollDao" ref="payrollDao" />
+		<property name="payrollEntryDao" ref="payrollEntryDao" />
+		<property name="hrptSessionSignonService" ref="hrptSessionSignonService" />
+	</bean>
+	
+	<bean id="payrollDashboardService" class="com.payroll.service.impl.PayrollDashboardServiceImpl">
+		<property name="payrollDataAccessDao" ref="payrollDataAccessDao" />
+		<property name="payrollDataEntryDao" ref="payrollDataEntryDao" />
+		<property name="payrollStagingDao" ref="payrollStagingDao" />
+		<property name="payrollEntryDao" ref="payrollEntryDao" />
+		<property name="payrollDao" ref="payrollDao" />
+		<property name="payrollProcessDao" ref="payrollProcessDao" />
+		<property name="spInsertSpecialPayroll" ref="spInsertSpecialPayroll" />
+		<property name="spDeleteSpecialPayroll" ref="spDeleteSpecialPayroll" />
+		<property name="spGetPayrollGroups" ref="spGetPayrollGroups" />
+		<property name="spGetPayrollGroupsByRole" ref="spGetPayrollGroupsByRole" />
+		<property name="spGetPayGroupByCompanyPerson" ref="spGetPayGroupByCompanyPerson" />
+
+	</bean>
+	
+	<bean id="hrptSessionSignonService" class="com.payroll.service.impl.HRPTSessionSignonServiceImpl">
+		<property name="backendConfig" ref="backendConfig" />
+		<property name="userCompanyService" ref="userCompanyService" />
+		<property name="conversionService" ref="conversionService" />
+		<property name="psNamesSecurityDao" ref="psNamesSecurityDao" />
+		<property name="hrp_sessionFactory" ref="hrp_sessionFactory" />
+	</bean>
+	
+	
+	<bean id="payrollDataEntryService" class="com.payroll.service.impl.PayrollDataEntryServiceImpl">
+		<property name="payrollDataEntryDao" ref="payrollDataEntryDao" />
+		<property name="payrollDataAccessDao" ref="payrollDataAccessDao" />
+		<property name="payrollProcessDao" ref="payrollProcessDao" />
+		<property name="payrollService" ref="payrollService" />
+		<property name="spInitializePayrollGroupNew" ref="spInitializePayrollGroupNew" />
+		<property name="spUpdateSpecialPayrollPPData" ref="spUpdateSpecialPayrollPPData" />
+		<property name="conversionService" ref="conversionService" />
+	</bean>
+	<bean id="userCompanyService" class="com.ptg.payroll.hrp.sp.UserCompanyServiceImpl">
+	<property name="httpclient" ref="httpclient" />
+		<property name="backendConfig" ref="backendConfig" />
+		<property name="getUserCompanies" ref="getUserCompanies" />
+	</bean>
+	
+	<bean id="hrpSignonService" class="com.payroll.service.impl.HRPSignonServiceImpl">
+	<property name="seekerSignonService" ref="seekerSignonService" />
+		<property name="userCompanyService" ref="userCompanyService" />
+		<property name="conversionService" ref="conversionService" />
+	</bean>
+	<bean id="seekerSignonService" class="com.ptg.payroll.hrp.sp.SeekerSignonServiceImpl">
+	<property name="backendConfig" ref="backendConfig" />
+	</bean>
+
+
+	<!-- <bean id="authService" class="com.payroll.service.impl.AuthServiceImpl"/> -->
+
+	<!-- <bean id="javaMailSender" class="org.springframework.mail.javamail.JavaMailSenderImpl"> 
+		<property name="host" value="smtp.gmail.com" /> <property name="username" 
+		value="nsanodiya099@gmail.com" /> <property name="password" value="test@gmail.com" 
+		/> <property name="javaMailProperties"> <props> <prop key="mail.smtp.auth">true</prop> 
+		<prop key="mail.smtp.socketFactory.port">465</prop> <prop key="mail.smtp.socketFactory.class">javax.net.ssl.SSLSocketFactory</prop> 
+		<prop key="mail.smtp.port">465</prop> </props> </property> </bean> <bean 
+		id="mail" class="com.payroll.mail.TransportMail"> <property name="javaMailSender" 
+		ref="javaMailSender" /> </bean> -->
+
+</beans>
